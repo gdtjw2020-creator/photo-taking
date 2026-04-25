@@ -1,7 +1,7 @@
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElLoading, ElMessageBox } from 'element-plus'
-import { Loading } from '@element-plus/icons-vue'
+import { Loading, ZoomIn } from '@element-plus/icons-vue'
 import api from '../api'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '../store/auth'
@@ -60,6 +60,13 @@ const autoSaveFace = ref(true) // 默认开启自动保存
 const taskId = ref('')
 const isAgreed = ref(false)
 const photoshootCounts = [1, 2, 3, 4, 5]
+const previewList = ref([])
+const showViewer = ref(false)
+
+const showPreview = (url) => {
+  previewList.value = [url]
+  showViewer.value = true
+}
 
 const selectTemplate = (template) => {
   selectedTemplate.value = template
@@ -273,15 +280,28 @@ const handleSuggest = () => {
           :class="{ active: selectedTemplate?.id === tpl.id }"
           @click="selectTemplate(tpl)"
         >
-          <el-image 
-            :src="tpl.preview" 
-            :alt="tpl.name" 
-            fit="cover"
-            class="template-img"
-          ></el-image>
-
+          <div class="template-img-container">
+            <el-image 
+              :src="tpl.preview" 
+              :alt="tpl.name" 
+              fit="cover"
+              class="template-img"
+            ></el-image>
+            <div class="zoom-btn" @click.stop="showPreview(tpl.preview)">
+                <el-icon><ZoomIn /></el-icon>
+            </div>
+          </div>
           <span>{{ tpl.name }}</span>
         </div>
+
+        <!-- 独立的图片预览器 -->
+        <el-image-viewer 
+            v-if="showViewer" 
+            @close="showViewer = false" 
+            :url-list="previewList" 
+            teleported
+        />
+
         
         <!-- 新增：许愿卡片 -->
         <div class="template-item suggest-item" @click="handleSuggest">
@@ -449,10 +469,40 @@ const handleSuggest = () => {
   box-shadow: 0 0 15px rgba(99, 102, 241, 0.4);
 }
 
-.template-img {
+.template-img-container {
   width: 100%;
   height: 120px;
+  position: relative;
 }
+
+.template-img {
+  width: 100%;
+  height: 100%;
+}
+
+.zoom-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 1.1rem;
+  backdrop-filter: blur(4px);
+  z-index: 2;
+  transition: all 0.2s;
+}
+
+.zoom-btn:hover {
+  background: var(--primary-color);
+  transform: scale(1.1);
+}
+
 
 .suggest-item {
   border: 2px dashed rgba(255, 255, 255, 0.1) !important;
