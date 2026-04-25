@@ -276,13 +276,10 @@ const handleSuggest = () => {
           <el-image 
             :src="tpl.preview" 
             :alt="tpl.name" 
-            :preview-src-list="templates.map(t => t.preview)"
-            :initial-index="templates.indexOf(tpl)"
             fit="cover"
-            preview-teleported
             class="template-img"
-            @click.stop
           ></el-image>
+
           <span>{{ tpl.name }}</span>
         </div>
         
