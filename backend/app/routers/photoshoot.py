@@ -11,7 +11,7 @@ import random
 from ..services.r2_service import r2_service
 from ..services.ai_service import ai_service
 from ..services.supabase_service import supabase_service
-from ..services.image_utils import add_ai_watermark
+from ..services.image_utils import add_ai_watermark, apply_watermark_to_bytes
 from ..dependencies import get_user_id, check_service_active
 from ..config import CREDITS_PER_PHOTOSHOOT
 from datetime import datetime
@@ -214,11 +214,14 @@ async def process_photoshoot_task(task_id: str, user_id: str, input_url: str, pr
                             async with httpx.AsyncClient() as client:
                                 resp = await client.get(external_url, timeout=60.0)
                                 if resp.status_code == 200:
+                                    # 添加半透明水印 (合规要求，20% 透明度)
+                                    watermarked_content = apply_watermark_to_bytes(resp.content)
+                                    
                                     # 生成唯一文件名并保存到 R2
                                     today = datetime.now().strftime("%Y%m%d")
                                     filename = f"{uuid.uuid4()}.png"
                                     object_name = f"photoshoots/outputs/{today}/{user_id}/{filename}"
-                                    uploaded_url = r2_service.upload_content(resp.content, object_name)
+                                    uploaded_url = r2_service.upload_content(watermarked_content, object_name)
                                     if uploaded_url:
                                         final_url = uploaded_url
                                         print(f"✅ [DEBUG] Successfully stored to R2: {final_url}")
