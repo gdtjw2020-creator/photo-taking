@@ -381,7 +381,13 @@ const handleSuggest = () => {
         </div>
       </div>
       <p class="count-hint">选择多张将自动开启“全套摄影手法”：包含全景、特写、侧位等不同视角</p>
+      
+      <div class="total-cost-box">
+        消耗：<span class="cost-value">{{ (imageCount * 1.5).toFixed(1) }}</span> 积分
+        <span class="cost-unit">(1.5 积分/张)</span>
+      </div>
     </div>
+
 
     <div class="action-bar">
       <el-button 
@@ -751,4 +757,26 @@ const handleSuggest = () => {
   50% { opacity: 1; }
   100% { opacity: 0.5; }
 }
+.total-cost-box {
+  margin-top: 16px;
+  text-align: center;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 12px;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.cost-value {
+  color: var(--primary-color);
+  font-size: 1.2rem;
+  font-weight: bold;
+  margin: 0 4px;
+}
+
+.cost-unit {
+  font-size: 0.75rem;
+  margin-left: 4px;
+}
 </style>
+
