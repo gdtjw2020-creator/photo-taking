@@ -1,9 +1,10 @@
 import axios from 'axios'
 
 const api = axios.create({
-  baseURL: '/',
+  baseURL: import.meta.env.VITE_API_BASE_URL || '/',
   timeout: 60000
 })
+
 
 // 请求拦截器：注入 Token
 api.interceptors.request.use(config => {
