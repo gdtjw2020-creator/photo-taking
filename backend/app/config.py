@@ -5,7 +5,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # AI Provider Configuration
-AI_PROVIDER = os.getenv("AI_PROVIDER", "zhenzhen").lower() # 'zhenzhen' or 'openrouter'
+AI_PROVIDER = os.getenv("AI_PROVIDER", "zhenzhen").lower() # 'zhenzhen', 'openrouter', or 'openai'
+
+# AI API 配置 (所有提供商公用)
+AI_API_KEY = os.getenv("AI_API_KEY", "")
+AI_BASE_URL = os.getenv("AI_BASE_URL", "https://api.openai-proxy.com/v1")
 
 # 中间商 AI API配置 (GPT-image2)
 AI_API_KEY = os.getenv("AI_API_KEY", "")

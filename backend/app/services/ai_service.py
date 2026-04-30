@@ -7,8 +7,10 @@ from typing import List, Optional
 from ..config import (
     AI_API_KEY, AI_BASE_URL, AI_MODEL_NAME, AI_IMAGE_SIZE, AI_IMAGE_QUALITY,
     AI_IMAGE_OUTPUT_FORMAT, AI_IMAGE_MODERATION, AI_POLL_INTERVAL_SECONDS, AI_POLL_MAX_ATTEMPTS,
-    AI_PROVIDER, OPENROUTER_API_KEY, OPENROUTER_MODEL
+    AI_PROVIDER, OPENROUTER_API_KEY, OPENROUTER_MODEL,
+    AI_API_KEY, AI_BASE_URL
 )
+from openai import AsyncOpenAI
 
 class AIService:
     def __init__(self):
@@ -21,6 +23,12 @@ class AIService:
         self.moderation = AI_IMAGE_MODERATION
         self.poll_interval = AI_POLL_INTERVAL_SECONDS
         self.poll_max_attempts = AI_POLL_MAX_ATTEMPTS
+        
+        # Initialize OpenAI Client (Unified)
+        self.openai_client = AsyncOpenAI(
+            api_key=self.api_key,
+            base_url=self.base_url
+        )
 
     async def upload_file(self, file_content: bytes, filename: str) -> Optional[str]:
         """上传图片到第三方平台，获取一个他们能直接访问的内部 URL"""
@@ -46,14 +54,107 @@ class AIService:
             print(f"❌ 上传到平台异常: {str(e)}")
             return None
 
-    async def generate_images(self, input_url: str, prompt: str, ref_url: Optional[str] = None) -> List[str]:
+    async def generate_images(self, input_url: Optional[str], prompt: str, ref_url: Optional[str] = None, size: str = "auto", quality: str = "auto") -> List[str]:
         """
         核心生成逻辑入口 (路由到不同的 Provider)
         """
-        if AI_PROVIDER == "openrouter":
+        if AI_PROVIDER == "openai":
+            return await self._generate_openai(input_url, prompt, ref_url, size, quality)
+        elif AI_PROVIDER == "openrouter":
             return await self._generate_openrouter(input_url, prompt)
         else:
             return await self._generate_zhenzhen(input_url, prompt, ref_url)
+
+    async def _generate_openai(self, input_url: Optional[str], prompt: str, ref_url: Optional[str] = None, size: str = "auto", quality: str = "auto") -> List[str]:
+        """
+        使用 OpenAI 官方最新最佳实践 (针对 gpt-image-2 模型)
+        支持多图参考融合与 auto 尺寸/质量
+        """
+        job_no = random.randint(100, 999)
+        print(f"🚀 [OpenAI任务#{job_no}] 模式: 官方模型集成 ({AI_MODEL_NAME})...")
+        
+        try:
+            # 1. 准备请求参数 (遵循官方 Demo 最佳实践: DALL-E 3/gpt-image-2 JSON 模式)
+            # 根据 Demo (app/api/photobooth/route.ts)，gpt-image-2 在 JSON 模式下支持 images 数组
+            images_input = []
+            if input_url:
+                images_input.append({"image_url": input_url})
+            if ref_url:
+                images_input.append({"image_url": ref_url})
+
+            # 2. 准备增强提示词 (从 Demo 借鉴的输出要求，有助于保持一致性)
+            output_requirements = "Output requirements: preserve the exact people, poses, facial expressions, and scene composition as faithfully as possible."
+            final_prompt = f"{prompt}\n\n{output_requirements}"
+
+            # 3. 准备参数
+            # 换脸模式强制使用 auto，文生图模式使用环境配置尺寸
+            target_size = "auto" if input_url else (size if size else "auto")
+            target_quality = quality if quality else "auto"
+
+            # 调试日志
+            print(f"================ OpenAI DEBUG (Task #{job_no}) ================")
+            print(f"Interface: Image API (JSON Mode) | Endpoint: /images/edits")
+            print(f"Model: {AI_MODEL_NAME}")
+            print(f"Size: {target_size}")
+            print(f"Quality: {target_quality}")
+            print(f"Prompt: {prompt[:100]}...")
+            print(f"Images Input: {json.dumps(images_input)}")
+            print(f"============================================================")
+
+            # 4. 发起请求
+            # 使用 openai 客户端的内部 post 方法以自动处理 Auth 头部
+            # 或者使用 httpx 手动处理
+            endpoint = "/images/edits"
+            payload = {
+                "model": AI_MODEL_NAME,
+                "prompt": final_prompt,
+                "images": images_input,
+                "size": target_size,
+                "quality": target_quality,
+                "output_format": self.output_format or "png"
+            }
+
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                headers = {
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json"
+                }
+                # 注意：这里我们直接调用官方 API 路径
+                url = f"{self.base_url}/images/edits" if not self.base_url.endswith("/images/edits") else self.base_url
+                
+                response = await client.post(url, headers=headers, json=payload)
+                
+                if response.status_code != 200:
+                    print(f"❌ [OpenAI任务#{job_no}] 请求失败 ({response.status_code}): {response.text}")
+                    return []
+
+                result_data = response.json()
+
+            # 5. 解析结果
+            image_urls = []
+            if "data" in result_data:
+                for item in result_data["data"]:
+                    url = item.get("url")
+                    b64 = item.get("b64_json")
+                    if url:
+                        image_urls.append(url)
+                    elif b64:
+                        # 如果是 Base64，自动拼接 Data URI 前缀
+                        prefix = f"data:image/{self.output_format or 'png'};base64,"
+                        image_urls.append(f"{prefix}{b64}")
+
+            if image_urls:
+                print(f"✅ [OpenAI任务#{job_no}] 生成成功: {len(image_urls)} 张图")
+                return image_urls
+            
+            print(f"⚠️ [OpenAI任务#{job_no}] 未找到生成结果: {result_data}")
+            return []
+
+
+
+        except Exception as e:
+            print(f"‼️ [OpenAI任务#{job_no}] 异常: {str(e)}")
+            return []
 
     async def _generate_openrouter(self, input_url: str, prompt: str) -> List[str]:
         """

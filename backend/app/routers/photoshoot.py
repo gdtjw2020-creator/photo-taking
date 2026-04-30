@@ -13,16 +13,19 @@ from ..services.ai_service import ai_service
 from ..services.supabase_service import supabase_service
 from ..services.image_utils import add_ai_watermark, apply_watermark_to_bytes
 from ..dependencies import get_user_id, check_service_active
-from ..config import CREDITS_PER_PHOTOSHOOT
+from ..config import CREDITS_PER_PHOTOSHOOT, AI_IMAGE_QUALITY, AI_IMAGE_SIZE
 from datetime import datetime
 
 router = APIRouter()
 
 class PhotoshootRequest(BaseModel):
     template_id: Optional[str] = None
-    image_url: str
+    image_url: Optional[str] = None # 改为可选：如果不传则为纯模板生成模式
     reference_image_urls: Optional[List[str]] = None
     image_count: Optional[int] = 1 # 默认为 1 张
+    is_face_swap: bool = False     # 显式指定是否换脸
+    quality: str = AI_IMAGE_QUALITY      # 读取 .env 中的质量配置 (auto, high, medium, low)
+    size: str = AI_IMAGE_SIZE            # 读取 .env 中的尺寸配置
 
 class PhotoshootResponse(BaseModel):
     task_id: str
@@ -127,7 +130,7 @@ async def generate_photoshoot(
         task_id=task_id,
         user_id=user_id,
         template_id=request.template_id if request.template_id and len(request.template_id) > 10 else None,
-        input_url=request.image_url
+        input_url=request.image_url # 此时可以是 None
     )
     
     if not success:
@@ -137,7 +140,7 @@ async def generate_photoshoot(
     selected_prompts = []
     if request.reference_image_urls:
         # 如果有参考图，优化提示词以更好地触发底层多图换脸
-        selected_prompts = ["将第一张图(image_0)中的人脸，完美替换到第二张图(image_1)的人物上。要求保持第二张图的所有动作、姿势、服装和背景完全不变，仅做无痕换脸融合。"] * request.image_count
+        selected_prompts = ["使用图片1(image_0)的人脸，生成和图片2(image_1)中人物一样的动作,姿势和人脸朝向，保持图2的服装和背景不变。"] * request.image_count
     else:
         # 否则走旧的模板逻辑
         templates = supabase_service.get_all_templates()
@@ -158,7 +161,9 @@ async def generate_photoshoot(
         user_id,
         request.image_url,
         selected_prompts,
-        request.reference_image_urls
+        request.reference_image_urls,
+        request.quality,
+        request.size
     )
     
     return PhotoshootResponse(
@@ -220,7 +225,7 @@ async def get_task_status(task_id: str):
             
     return task
 
-async def process_photoshoot_task(task_id: str, user_id: str, input_url: str, prompts: List[str], reference_urls: Optional[List[str]] = None):
+async def process_photoshoot_task(task_id: str, user_id: str, input_url: Optional[str], prompts: List[str], reference_urls: Optional[List[str]] = None, quality: str = "auto", size: str = "auto"):
     """异步处理约拍任务 (支持逐张生成、实时扣费及 900s 硬超时)"""
     # 1. 更新状态为处理中
     supabase_service.update_task_status(task_id, "processing")
@@ -235,8 +240,8 @@ async def process_photoshoot_task(task_id: str, user_id: str, input_url: str, pr
             for i, p in enumerate(prompts):
                 try:
                     ref_url = reference_urls[i] if reference_urls and i < len(reference_urls) else None
-                    print(f"[DEBUG] Generating image {i+1}/{len(prompts)} for task {task_id}")
-                    results = await ai_service.generate_images(input_url, p, ref_url)
+                    print(f"[DEBUG] Generating image {i+1}/{len(prompts)} for task {task_id} (input_url={'present' if input_url else 'absent'})")
+                    results = await ai_service.generate_images(input_url, p, ref_url, size, quality)
                     
                     if results and len(results) > 0:
                         external_url = results[0]
