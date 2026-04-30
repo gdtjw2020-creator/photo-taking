@@ -1,4 +1,5 @@
 from supabase import create_client, Client
+from datetime import datetime, timezone
 from ..config import SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, INITIAL_CREDITS
 
 # 本地内存缓存，防止数据库写入失败导致前端 404
@@ -20,7 +21,7 @@ class SupabaseService:
             "template_id": template_id,
             "input_url": input_url,
             "status": "pending",
-            "created_at": "now" # 内存版本用
+            "created_at": datetime.now(timezone.utc).isoformat() # 内存版本用，使用 ISO 格式
         }
         # 存入本地内存缓存（双写保险）
         _local_task_cache[task_id] = data
@@ -254,12 +255,11 @@ class SupabaseService:
             amount = code_data.get("amount", 0)
             
             # 2. 标记为已使用 (通过 update 返回结果确认是否竞争成功)
-            from datetime import datetime
             update_res = self.supabase.table("redeem_codes")\
                 .update({
                     "is_used": True, 
                     "used_by": user_id, 
-                    "used_at": datetime.now().isoformat()
+                    "used_at": datetime.now(timezone.utc).isoformat()
                 })\
                 .eq("id", code_data["id"])\
                 .eq("is_used", False)\

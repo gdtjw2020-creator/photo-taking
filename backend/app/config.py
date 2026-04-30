@@ -4,12 +4,23 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# AI Provider Configuration
+AI_PROVIDER = os.getenv("AI_PROVIDER", "zhenzhen").lower() # 'zhenzhen' or 'openrouter'
+
 # 中间商 AI API配置 (GPT-image2)
 AI_API_KEY = os.getenv("AI_API_KEY", "")
 AI_BASE_URL = os.getenv("AI_BASE_URL", "https://api.openai-proxy.com/v1")
-AI_MODEL_NAME = os.getenv("AI_MODEL_NAME", "gpt-image2")
-AI_IMAGE_SIZE = os.getenv("AI_IMAGE_SIZE", "1152x2048")
+AI_MODEL_NAME = os.getenv("AI_MODEL_NAME", "gpt-image-2")
+AI_IMAGE_SIZE = os.getenv("AI_IMAGE_SIZE", "1440x2560")
 AI_IMAGE_QUALITY = os.getenv("AI_IMAGE_QUALITY", "high")
+AI_IMAGE_OUTPUT_FORMAT = os.getenv("AI_IMAGE_OUTPUT_FORMAT", "webp")
+AI_IMAGE_MODERATION = os.getenv("AI_IMAGE_MODERATION", "low")
+AI_POLL_INTERVAL_SECONDS = int(os.getenv("AI_POLL_INTERVAL_SECONDS", "5"))
+AI_POLL_MAX_ATTEMPTS = int(os.getenv("AI_POLL_MAX_ATTEMPTS", "120"))
+
+# OpenRouter Configuration
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "openai/gpt-5.4-image-2")
 
 # Supabase配置
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")

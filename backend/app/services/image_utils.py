@@ -57,9 +57,9 @@ def apply_watermark_to_bytes(image_bytes: bytes, text: str = "AI生成") -> byte
         # 合并图层
         out = Image.alpha_composite(img, txt_layer)
         
-        # 转回 RGB 并输出为字节流
+        # 保持无损质量，输出为 PNG 格式
         output = io.BytesIO()
-        out.convert("RGB").save(output, format="JPEG", quality=95)
+        out.save(output, format="PNG")
         return output.getvalue()
     except Exception as e:
         print(f"Error applying watermark: {e}")

@@ -1,7 +1,7 @@
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElLoading, ElMessageBox } from 'element-plus'
-import { Loading, ZoomIn } from '@element-plus/icons-vue'
+import { Loading, ZoomIn, Close, Plus } from '@element-plus/icons-vue'
 import api from '../api'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '../store/auth'
@@ -53,6 +53,9 @@ onMounted(async () => {
 
 const selectedTemplate = ref(null)
 const uploadedImageUrl = ref('')
+const referenceImages = ref([]) // 新增：参考图数组
+const isRefUploading = ref(false) // 新增：参考图上传状态
+const activeTab = ref('template') // 新增：当前激活的模式 ('template' 或 'custom')
 const imageCount = ref(1) // 默认 1 张
 const isUploading = ref(false)
 const isGenerating = ref(false)
@@ -99,6 +102,32 @@ const handleUpload = async (file) => {
   }
 }
 
+const handleRefUpload = async (file) => {
+  if (!isLoggedIn.value) {
+    ElMessage.warning('请先登录后开始上传照片')
+    return
+  }
+  isRefUploading.value = true
+  const formData = new FormData()
+  formData.append('file', file.raw)
+
+  try {
+    const res = await api.post('/api/photoshoot/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+    referenceImages.value.push(res.data.url)
+    ElMessage.success('参考图上传成功')
+  } catch (err) {
+    ElMessage.error('上传失败，请重试')
+  } finally {
+    isRefUploading.value = false
+  }
+}
+
+const removeRef = (index) => {
+  referenceImages.value.splice(index, 1)
+}
+
 const saveCurrentFace = async () => {
   if (!uploadedImageUrl.value) return
   console.log('[DEBUG] Attempting to save face:', uploadedImageUrl.value)
@@ -125,9 +154,23 @@ const submitTask = async () => {
     ElMessage.error('请登录后开启约拍任务')
     return
   }
-  if (!selectedTemplate.value || !uploadedImageUrl.value) {
-    ElMessage.warning('请先选择模板并上传照片')
-    return
+  
+  if (activeTab.value === 'custom') {
+    // 自定义参考图模式
+    if (referenceImages.value.length === 0) {
+      ElMessage.warning('请先上传至少一张换脸底图')
+      return
+    }
+    if (!uploadedImageUrl.value) {
+      ElMessage.warning('请先上传一张人脸正面照片')
+      return
+    }
+  } else {
+    // 模板模式
+    if (!selectedTemplate.value || !uploadedImageUrl.value) {
+      ElMessage.warning('请先选择模板并上传照片')
+      return
+    }
   }
 
   // 新增：法律声明强制校验
@@ -156,11 +199,14 @@ const submitTask = async () => {
         await saveCurrentFace()
     }
 
-    const res = await api.post('/api/photoshoot/generate', {
-      template_id: selectedTemplate.value.id,
+    const payload = {
+      template_id: activeTab.value === 'template' ? selectedTemplate.value.id : null,
       image_url: uploadedImageUrl.value,
-      image_count: imageCount.value
-    })
+      reference_image_urls: activeTab.value === 'custom' ? referenceImages.value : undefined,
+      image_count: activeTab.value === 'custom' ? referenceImages.value.length : imageCount.value
+    }
+
+    const res = await api.post('/api/photoshoot/generate', payload)
     taskId.value = res.data.task_id
     resultImages.value = [] // 立即重置旧图片，显示新占位符
     ElMessage.success('任务已提交，正在修图中...')
@@ -271,44 +317,77 @@ const handleSuggest = () => {
 <template>
   <div class="generate-container">
     <div class="step-card glass-card">
-      <h2>1. 选择写真风格</h2>
-      <div class="template-grid">
-        <div 
-          v-for="tpl in templates" 
-          :key="tpl.id" 
-          class="template-item" 
-          :class="{ active: selectedTemplate?.id === tpl.id }"
-          @click="selectTemplate(tpl)"
-        >
-          <div class="template-img-container">
-            <el-image 
-              :src="tpl.preview" 
-              :alt="tpl.name" 
-              fit="cover"
-              class="template-img"
-            ></el-image>
-            <div class="zoom-btn" @click.stop="showPreview(tpl.preview)">
-                <el-icon><ZoomIn /></el-icon>
+      <div class="mode-tabs">
+        <div class="mode-tab" :class="{ active: activeTab === 'template' }" @click="activeTab = 'template'">预设写真风格</div>
+        <div class="mode-tab" :class="{ active: activeTab === 'custom' }" @click="activeTab = 'custom'">自定义换脸图</div>
+      </div>
+
+      <div v-show="activeTab === 'template'">
+        <div class="template-grid">
+          <div 
+            v-for="tpl in templates" 
+            :key="tpl.id" 
+            class="template-item" 
+            :class="{ active: selectedTemplate?.id === tpl.id }"
+            @click="selectTemplate(tpl)"
+          >
+            <div class="template-img-container">
+              <el-image 
+                :src="tpl.preview" 
+                :alt="tpl.name" 
+                fit="cover"
+                class="template-img"
+              ></el-image>
+              <div class="zoom-btn" @click.stop="showPreview(tpl.preview)">
+                  <el-icon><ZoomIn /></el-icon>
+              </div>
+            </div>
+            <span>{{ tpl.name }}</span>
+          </div>
+
+          <!-- 独立的图片预览器 -->
+          <el-image-viewer 
+              v-if="showViewer" 
+              @close="showViewer = false" 
+              :url-list="previewList" 
+              teleported
+          />
+
+          
+          <!-- 新增：许愿卡片 -->
+          <div class="template-item suggest-item" @click="handleSuggest">
+            <div class="suggest-content">
+              <div class="plus-icon">+</div>
+              <span>想要更多风格？</span>
             </div>
           </div>
-          <span>{{ tpl.name }}</span>
         </div>
+      </div>
 
-        <!-- 独立的图片预览器 -->
-        <el-image-viewer 
-            v-if="showViewer" 
-            @close="showViewer = false" 
-            :url-list="previewList" 
-            teleported
-        />
-
-        
-        <!-- 新增：许愿卡片 -->
-        <div class="template-item suggest-item" @click="handleSuggest">
-          <div class="suggest-content">
-            <div class="plus-icon">+</div>
-            <span>想要更多风格？</span>
+      <!-- 自定义参考图上传区 -->
+      <div v-show="activeTab === 'custom'" class="custom-ref-area">
+        <p class="sub-hint">上传你想要换脸的模特底图（最多 5 张）。</p>
+        <div class="ref-list">
+          <div v-for="(img, idx) in referenceImages" :key="idx" class="ref-item">
+            <el-image :src="img" fit="cover" class="ref-img"></el-image>
+            <div class="del-btn" @click.stop="removeRef(idx)">
+              <el-icon><Close /></el-icon>
+            </div>
           </div>
+          
+          <el-upload
+            v-if="referenceImages.length < 5"
+            class="ref-upload-box"
+            action="#"
+            :auto-upload="false"
+            :show-file-list="false"
+            :on-change="handleRefUpload"
+            accept="image/*"
+          >
+            <div class="ref-upload-btn" v-loading="isRefUploading">
+              <el-icon><Plus /></el-icon>
+            </div>
+          </el-upload>
         </div>
       </div>
     </div>
@@ -369,21 +448,28 @@ const handleSuggest = () => {
 
     <div class="step-card glass-card">
       <h2>3. 约拍数量</h2>
-      <div class="count-selector">
-        <div 
-          v-for="count in photoshootCounts" 
-          :key="count" 
-          class="count-item"
-          :class="{ active: imageCount === count }"
-          @click="imageCount = count"
-        >
-          {{ count }} 张
-        </div>
+      <div v-if="activeTab === 'custom'" class="custom-ref-mode-hint">
+        <el-alert title="您已开启自定义参考图换脸模式" type="success" :closable="false" show-icon>
+          将为您逐一生成 {{ referenceImages.length || 0 }} 张照片。
+        </el-alert>
       </div>
-      <p class="count-hint">选择多张将自动开启“全套摄影手法”：包含全景、特写、侧位等不同视角</p>
+      <div v-else>
+        <div class="count-selector">
+          <div 
+            v-for="count in photoshootCounts" 
+            :key="count" 
+            class="count-item"
+            :class="{ active: imageCount === count }"
+            @click="imageCount = count"
+          >
+            {{ count }} 张
+          </div>
+        </div>
+        <p class="count-hint">选择多张将自动开启“全套摄影手法”：包含全景、特写、侧位等不同视角</p>
+      </div>
       
       <div class="total-cost-box">
-        消耗：<span class="cost-value">{{ (imageCount * 1.5).toFixed(1) }}</span> 积分
+        消耗：<span class="cost-value">{{ ((activeTab === 'custom' ? referenceImages.length : imageCount) * 1.5).toFixed(1) }}</span> 积分
         <span class="cost-unit">(1.5 积分/张)</span>
       </div>
     </div>
@@ -396,12 +482,12 @@ const handleSuggest = () => {
         :loading="isGenerating"
         @click="submitTask"
       >
-        开启 AI 镜像约拍 (生成 {{ imageCount }} 张写真)
+        开启 AI 镜像约拍 (生成 {{ activeTab === 'custom' ? referenceImages.length : imageCount }} 张写真)
       </el-button>
     </div>
 
     <div v-if="taskStatus === 'completed' || taskStatus === 'processing'" class="result-section glass-card">
-      <h2>3. 约拍成果 <el-tag v-if="taskStatus === 'processing'" type="warning" size="small">正在拍摄中 ({{ resultImages.length }}/{{ imageCount }})</el-tag></h2>
+      <h2>3. 约拍成果 <el-tag v-if="taskStatus === 'processing'" type="warning" size="small">正在拍摄中 ({{ resultImages.length }}/{{ activeTab === 'custom' ? referenceImages.length : imageCount }})</el-tag></h2>
       <div class="result-grid">
         <!-- 已完成的图片 -->
         <div v-for="(url, index) in resultImages" :key="url" class="result-item">
@@ -415,7 +501,7 @@ const handleSuggest = () => {
           ></el-image>
         </div>
         <!-- 正在生成的占位符 -->
-        <div v-for="n in (imageCount - resultImages.length)" :key="'loading-'+n" class="result-item loading-placeholder" v-if="taskStatus === 'processing'">
+        <div v-for="n in Math.max(0, (activeTab === 'custom' ? referenceImages.length : imageCount) - resultImages.length)" :key="'loading-'+n" class="result-item loading-placeholder" v-if="taskStatus === 'processing'">
             <div class="loading-content">
                 <el-icon class="is-loading"><Loading /></el-icon>
                 <span>正在冲洗...</span>
@@ -777,6 +863,123 @@ const handleSuggest = () => {
 .cost-unit {
   font-size: 0.75rem;
   margin-left: 4px;
+}
+
+.custom-ref-area {
+  margin-top: 16px;
+}
+
+.mode-tabs {
+  display: flex;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 12px;
+  padding: 4px;
+  margin-bottom: 24px;
+}
+
+.mode-tab {
+  flex: 1;
+  text-align: center;
+  padding: 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-weight: 500;
+  transition: all 0.3s;
+}
+
+.mode-tab.active {
+  background: var(--primary-color);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin-bottom: 16px;
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.2);
+}
+
+.divider span {
+  padding: 0 16px;
+}
+
+.ref-list {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.ref-item {
+  width: 80px;
+  height: 120px;
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 2px solid var(--primary-color);
+}
+
+.ref-img {
+  width: 100%;
+  height: 100%;
+}
+
+.del-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  background: rgba(0,0,0,0.6);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  cursor: pointer;
+}
+
+.del-btn:hover {
+  background: var(--danger-color, #f56c6c);
+}
+
+.ref-upload-box {
+  width: 80px;
+  height: 120px;
+}
+
+.ref-upload-btn {
+  width: 80px;
+  height: 120px;
+  border: 2px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.ref-upload-btn:hover {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+.custom-ref-mode-hint {
+  margin-bottom: 16px;
 }
 </style>
 

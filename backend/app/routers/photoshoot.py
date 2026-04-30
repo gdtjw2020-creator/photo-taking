@@ -19,8 +19,9 @@ from datetime import datetime
 router = APIRouter()
 
 class PhotoshootRequest(BaseModel):
-    template_id: str
+    template_id: Optional[str] = None
     image_url: str
+    reference_image_urls: Optional[List[str]] = None
     image_count: Optional[int] = 1 # 默认为 1 张
 
 class PhotoshootResponse(BaseModel):
@@ -101,7 +102,14 @@ async def generate_photoshoot(
     active: bool = Depends(check_service_active)
 ):
     """开启约拍任务"""
-    # 0. 余额检查 (提前拦截，防止浪费 AI 资源)
+    # 0. 确定图片生成数量
+    if request.reference_image_urls:
+        request.image_count = len(request.reference_image_urls)
+        # 限制最多 5 张
+        if request.image_count > 5:
+            raise HTTPException(status_code=400, detail="最多只能上传 5 张参考图")
+            
+    # 1. 余额检查 (提前拦截，防止浪费 AI 资源)
     profile = supabase_service.get_user_profile(user_id)
     current_credits = profile.get("credits", 0)
     required_credits = request.image_count * CREDITS_PER_PHOTOSHOOT
@@ -114,35 +122,34 @@ async def generate_photoshoot(
 
     task_id = str(uuid.uuid4())
     
-    # 1. 创建数据库记录
-    # 注意：为了本地测试，如果 template_id 找不到，我们先忽略外键约束或者假设它存在
-    # 实际上由于 schema.sql 有外键，如果 template_id 不存在会报错。
-    # 这里我们先不校验，由 Supabase 返回错误
+    # 2. 创建数据库记录
     success = supabase_service.create_task(
         task_id=task_id,
         user_id=user_id,
-        template_id=request.template_id if len(request.template_id) > 10 else None, # 简单校验是否为 UUID
+        template_id=request.template_id if request.template_id and len(request.template_id) > 10 else None,
         input_url=request.image_url
     )
     
     if not success:
-        # 如果数据库报错（通常是外键约束），我们仍然允许任务继续，但无法在前端轮询
         print(f"Warning: Failed to create task record for {task_id}")
 
-    # 1. 从数据库/缓存获取模板 Prompts
-    templates = supabase_service.get_all_templates()
-    target_template = next((t for t in templates if str(t["id"]) == request.template_id), None)
-    
-    if not target_template:
-        # 兜底逻辑
-        base_prompts = ["唯美写真，人像，高清质感"]
+    # 3. 确定 Prompts 或 Reference URLs
+    selected_prompts = []
+    if request.reference_image_urls:
+        # 如果有参考图，优化提示词以更好地触发底层多图换脸
+        selected_prompts = ["将第一张图(image_0)中的人脸，完美替换到第二张图(image_1)的人物上。要求保持第二张图的所有动作、姿势、服装和背景完全不变，仅做无痕换脸融合。"] * request.image_count
     else:
-        # 获取数据库中的 5 个分镜
-        base_prompts = target_template.get("prompts", ["唯美写真，人像，高清质感"])
+        # 否则走旧的模板逻辑
+        templates = supabase_service.get_all_templates()
+        target_template = next((t for t in templates if str(t["id"]) == request.template_id), None)
+        
+        if not target_template:
+            base_prompts = ["唯美写真，人像，高清质感"]
+        else:
+            base_prompts = target_template.get("prompts", ["唯美写真，人像，高清质感"])
 
-    # 2. 从 5 个预设分镜中挑选 $N$ 个不重复的
-    count = min(max(request.image_count, 1), len(base_prompts))
-    selected_prompts = random.sample(base_prompts, count)
+        count = min(max(request.image_count, 1), len(base_prompts))
+        selected_prompts = random.sample(base_prompts, count)
     
     # 异步执行生成逻辑
     background_tasks.add_task(
@@ -150,7 +157,8 @@ async def generate_photoshoot(
         task_id,
         user_id,
         request.image_url,
-        selected_prompts
+        selected_prompts,
+        request.reference_image_urls
     )
     
     return PhotoshootResponse(
@@ -188,51 +196,95 @@ async def get_task_status(task_id: str):
     task = supabase_service.get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
+        
+    # 如果任务仍在处理中，基于创建时间做“僵尸任务”兜底检测 (防止后端轮询死锁)
+    if task.get("status") == "processing" and "created_at" in task:
+        from datetime import datetime, timezone
+        try:
+            created_at_str = task["created_at"]
+            if created_at_str == "now":
+                # 如果是还没来得及更新的缓存数据，先跳过检测
+                return task
+                
+            created_time = datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
+            now = datetime.now(timezone.utc)
+            elapsed_seconds = (now - created_time).total_seconds()
+            
+            # 如果超过 900 秒 (15分钟) 仍然在 processing，判定为底层卡死，强制干掉
+            if elapsed_seconds > 900:
+                supabase_service.update_task_status(task_id, "failed", error_message="生成任务在底层卡死或严重超时，已被系统安全熔断")
+                task["status"] = "failed"
+                task["error_message"] = "生成任务在底层卡死或严重超时，已被系统安全熔断"
+        except Exception as e:
+            print(f"解析时间检测僵尸任务失败: {e}, 原始时间字符串: {task.get('created_at')}")
+            
     return task
 
-async def process_photoshoot_task(task_id: str, user_id: str, input_url: str, prompts: List[str]):
+async def process_photoshoot_task(task_id: str, user_id: str, input_url: str, prompts: List[str], reference_urls: Optional[List[str]] = None):
     """异步处理约拍任务 (支持逐张生成、实时扣费及 900s 硬超时)"""
     # 1. 更新状态为处理中
     supabase_service.update_task_status(task_id, "processing")
     
     success_count = 0
+    last_error_msg = "所有图片生成均失败"
+    
     try:
         # 设置整个任务的最大允许时间为 900 秒
         async def run_prompts():
-            nonlocal success_count
+            nonlocal success_count, last_error_msg
             for i, p in enumerate(prompts):
                 try:
+                    ref_url = reference_urls[i] if reference_urls and i < len(reference_urls) else None
                     print(f"[DEBUG] Generating image {i+1}/{len(prompts)} for task {task_id}")
-                    results = await ai_service.generate_images(input_url, p)
+                    results = await ai_service.generate_images(input_url, p, ref_url)
                     
                     if results and len(results) > 0:
                         external_url = results[0]
                         # 重点：转存到 R2 以持久化，避免第三方保存时间不可控
-                        print(f"[DEBUG] Transferring result to R2: {external_url}")
+                        print(f"[DEBUG] Transferring result to R2 (length: {len(external_url)})")
                         final_url = external_url
                         try:
-                            async with httpx.AsyncClient() as client:
-                                resp = await client.get(external_url, timeout=60.0)
-                                if resp.status_code == 200:
-                                    # 添加半透明水印 (合规要求，20% 透明度)
-                                    watermarked_content = apply_watermark_to_bytes(resp.content)
-                                    
-                                    # 生成唯一文件名并保存到 R2
-                                    today = datetime.now().strftime("%Y%m%d")
-                                    filename = f"{uuid.uuid4()}.png"
-                                    object_name = f"photoshoots/outputs/{today}/{user_id}/{filename}"
-                                    uploaded_url = r2_service.upload_content(watermarked_content, object_name)
-                                    if uploaded_url:
-                                        final_url = uploaded_url
-                                        print(f"✅ [DEBUG] Successfully stored to R2: {final_url}")
+                            # 处理 Base64
+                            if external_url.startswith("data:image"):
+                                import base64
+                                header, encoded = external_url.split(",", 1)
+                                content = base64.b64decode(encoded)
+                                watermarked_content = apply_watermark_to_bytes(content)
+                                
+                                today = datetime.now().strftime("%Y%m%d")
+                                filename = f"{uuid.uuid4()}.png"
+                                object_name = f"photoshoots/outputs/{today}/{user_id}/{filename}"
+                                uploaded_url = r2_service.upload_content(watermarked_content, object_name)
+                                if uploaded_url:
+                                    final_url = uploaded_url
+                                    print(f"✅ [DEBUG] Successfully stored Base64 to R2: {final_url}")
+                            # 处理 URL
+                            else:
+                                async with httpx.AsyncClient() as client:
+                                    resp = await client.get(external_url, timeout=60.0)
+                                    if resp.status_code == 200:
+                                        # 添加半透明水印 (合规要求，20% 透明度)
+                                        watermarked_content = apply_watermark_to_bytes(resp.content)
+                                        
+                                        # 生成唯一文件名并保存到 R2
+                                        today = datetime.now().strftime("%Y%m%d")
+                                        filename = f"{uuid.uuid4()}.png"
+                                        object_name = f"photoshoots/outputs/{today}/{user_id}/{filename}"
+                                        uploaded_url = r2_service.upload_content(watermarked_content, object_name)
+                                        if uploaded_url:
+                                            final_url = uploaded_url
+                                            print(f"✅ [DEBUG] Successfully stored URL to R2: {final_url}")
                         except Exception as e:
                             print(f"‼️ [ERROR] Failed to transfer to R2: {e}")
 
                         supabase_service.append_task_output(task_id, final_url)
                         supabase_service.deduct_credits(user_id, CREDITS_PER_PHOTOSHOOT, f"约拍生成: 任务 {task_id[:8]} 第 {i+1} 张")
                         success_count += 1
+                    else:
+                        last_error_msg = "生成结果为空"
                 except Exception as e:
                     print(f"[ERROR] Task {task_id} step {i+1} failed: {e}")
+                    last_error_msg = str(e)
                     continue
         
         await asyncio.wait_for(run_prompts(), timeout=900)
@@ -250,7 +302,7 @@ async def process_photoshoot_task(task_id: str, user_id: str, input_url: str, pr
     if success_count > 0:
         supabase_service.update_task_status(task_id, "completed")
     else:
-        supabase_service.update_task_status(task_id, "failed", error_message="所有图片生成均失败")
+        supabase_service.update_task_status(task_id, "failed", error_message=last_error_msg)
 
 @router.get("/download")
 async def proxy_download(url: str):
