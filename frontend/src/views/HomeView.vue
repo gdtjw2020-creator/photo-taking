@@ -10,6 +10,13 @@ const startPhotoshoot = () => {
 
 <template>
   <div class="home-container">
+    <div class="announcement glass-card">
+      <div class="announcement-content">
+        <span class="announcement-icon">📢</span>
+        <p>当前接口调用人数较多，请尽量在非高峰时段来使用或者失败后可适当尝试一下</p>
+      </div>
+    </div>
+
     <header class="hero">
       <h1>AI女神约拍神器</h1>
       <p>记录身边人的美，定格最动人的瞬间</p>
@@ -40,6 +47,39 @@ const startPhotoshoot = () => {
 <style scoped>
 .home-container {
   padding: 20px;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.announcement {
+  margin-top: 10px;
+  margin-bottom: 30px;
+  padding: 16px;
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  background: rgba(251, 191, 36, 0.05);
+  animation: slideIn 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(-20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.announcement-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.announcement-icon {
+  font-size: 1.4rem;
+}
+
+.announcement p {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #fbbf24;
+  line-height: 1.5;
 }
 
 .hero {
