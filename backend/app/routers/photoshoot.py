@@ -140,7 +140,12 @@ async def generate_photoshoot(
     selected_prompts = []
     if request.reference_image_urls:
         # 如果有参考图，优化提示词以更好地触发底层多图换脸
-        selected_prompts = ["使用图片1(image_0)的人脸，生成和图片2(image_1)中人物一样的动作,姿势和人脸朝向，保持图2的服装和背景不变。"] * request.image_count
+        selected_prompts = ["""### 角色定义：
+- 图片1(image_0): 人脸参考源 (Face Source)
+- 图片2(image_1): 动作/姿势/背景底图 (Target Background & Pose)
+
+### 任务：
+请提取图片1(image_0)的人脸特征，将其精准移植到图片2(image_1)的人物头部。保持图片2(image_1)的服装、背景、动作和姿势完全不变。"""] * request.image_count
     else:
         # 否则走旧的模板逻辑
         templates = supabase_service.get_all_templates()

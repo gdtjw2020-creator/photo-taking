@@ -469,8 +469,8 @@ const handleSuggest = () => {
       </div>
       
       <div class="total-cost-box">
-        消耗：<span class="cost-value">{{ ((activeTab === 'custom' ? referenceImages.length : imageCount) * 1.5).toFixed(1) }}</span> 积分
-        <span class="cost-unit">(1.5 积分/张)</span>
+        消耗：<span class="cost-value">{{ ((activeTab === 'custom' ? referenceImages.length : imageCount) * 5).toFixed(1) }}</span> 积分
+        <span class="cost-unit">(5 积分/张)</span>
       </div>
     </div>
 
