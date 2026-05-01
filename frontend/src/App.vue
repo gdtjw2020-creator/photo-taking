@@ -44,8 +44,9 @@ html, body {
   background-color: var(--bg-dark);
   color: #f8fafc;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  font-size: 16px; /* 强制基础字号，防止移动端过小 */
+  font-size: 16px; /* 强制基础字号 */
   -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%; /* 防止移动端字体自动调整大小 */
 }
 
 .app-container {

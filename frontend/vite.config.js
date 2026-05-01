@@ -11,5 +11,9 @@ export default defineConfig({
         changeOrigin: true
       }
     }
+  },
+  build: {
+    target: 'es2015', // 提高老旧手机浏览器的兼容性
+    cssTarget: 'chrome61'
   }
 })
