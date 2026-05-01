@@ -7,10 +7,26 @@ import router from './router'
 import './assets/main.css'
 import VConsole from 'vconsole'
 
-// 仅在移动端且非生产环境下开启调试 (或者暂时开启帮助用户排查)
-if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-    new VConsole();
-}
+// vConsole 隐藏式触发逻辑：快速点击屏幕 6 次开启
+let clickCount = 0;
+let lastClickTime = 0;
+let vconsoleInstance = null;
+
+window.addEventListener('click', () => {
+    const now = Date.now();
+    if (now - lastClickTime < 500) {
+        clickCount++;
+    } else {
+        clickCount = 1;
+    }
+    lastClickTime = now;
+
+    if (clickCount >= 6 && !vconsoleInstance) {
+        vconsoleInstance = new VConsole();
+        console.log('vConsole 已通过隐藏手势激活');
+        clickCount = 0;
+    }
+});
 
 const app = createApp(App)
 

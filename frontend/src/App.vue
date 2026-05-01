@@ -46,11 +46,14 @@ html, body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: 16px; /* 强制基础字号 */
   -webkit-font-smoothing: antialiased;
-  -webkit-text-size-adjust: 100%; /* 防止移动端字体自动调整大小 */
+  -webkit-text-size-adjust: 100%;
+  -moz-text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 .app-container {
-  width: 100%;
+  width: 100vw; /* 显式使用视口宽度 */
   max-width: 1000px;
   margin: 0 auto;
   min-height: 100dvh;
@@ -59,6 +62,13 @@ html, body {
   position: relative;
   background-color: var(--bg-dark);
   box-sizing: border-box;
+}
+
+/* 针对部分手机浏览器（如华为）的特殊优化：当屏幕较小时，严格限制最大宽度 */
+@media (max-width: 500px) {
+  .app-container {
+    max-width: 100vw;
+  }
 }
 
 .tab-bar {
