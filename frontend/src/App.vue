@@ -36,23 +36,28 @@ onMounted(() => {
 </template>
 
 <style>
-body {
+html, body {
   margin: 0;
   padding: 0;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-  background-color: #0f172a;
+  width: 100%;
+  overflow-x: hidden;
+  background-color: var(--bg-dark);
   color: #f8fafc;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 16px; /* 强制基础字号，防止移动端过小 */
+  -webkit-font-smoothing: antialiased;
 }
 
 .app-container {
   width: 100%;
-  max-width: 1000px; /* 增加最大宽度以适配 PC 展示 */
+  max-width: 1000px;
   margin: 0 auto;
-  min-height: 100dvh; /* 动态视口高度，解决移动端浏览器工具栏遮挡问题 */
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   position: relative;
   background-color: var(--bg-dark);
+  box-sizing: border-box;
 }
 
 .tab-bar {
@@ -96,8 +101,8 @@ body {
 }
 
 .tab-label {
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-size: 1.2rem;
+  font-weight: 700;
   margin-top: 4px;
 }
 </style>

@@ -9,12 +9,19 @@ import { useAuthStore } from '../store/auth'
 const route = useRoute()
 const authStore = useAuthStore()
 const isLoggedIn = computed(() => authStore.isLoggedIn)
+const CREDITS_PER_IMAGE = ref(5) // 默认为 5，之后从后端动态同步
 
 const templates = ref([])
 const savedFaces = ref([])
 
 onMounted(async () => {
   try {
+    // 同步后端配置（实现环境变量统一）
+    const configRes = await api.get('/api/photoshoot/config')
+    if (configRes.data?.credits_per_photoshoot) {
+        CREDITS_PER_IMAGE.value = configRes.data.credits_per_photoshoot
+    }
+
     // 加载模板
     const tplRes = await api.get('/api/photoshoot/templates')
     templates.value = tplRes.data
@@ -475,8 +482,8 @@ const handleSuggest = () => {
       </div>
       
       <div class="total-cost-box">
-        消耗：<span class="cost-value">{{ ((activeTab === 'custom' ? referenceImages.length : imageCount) * 5).toFixed(1) }}</span> 积分
-        <span class="cost-unit">(5 积分/张)</span>
+        消耗：<span class="cost-value">{{ ((activeTab === 'custom' ? referenceImages.length : imageCount) * CREDITS_PER_IMAGE).toFixed(1) }}</span> 积分
+        <span class="cost-unit">({{ CREDITS_PER_IMAGE }} 积分/张)</span>
       </div>
     </div>
 
@@ -543,16 +550,16 @@ const handleSuggest = () => {
 
 <style scoped>
 .generate-container {
-  padding: 16px;
+  padding: 20px 16px 100px 16px; /* 增加底部间距，为导航栏留出呼吸空间 */
   width: 100%;
-  max-width: 1000px; /* 进一步增加最大宽度以适配 PC 展示 */
+  max-width: 1000px;
   margin: 0 auto;
   box-sizing: border-box;
 }
 
 .step-card {
-  padding: 20px;
-  margin-bottom: 24px;
+  padding: 24px 20px; /* 增加内边距 */
+  margin-bottom: 30px; /* 增加卡片间距 */
 }
 
 .step-card h2 {
@@ -563,8 +570,8 @@ const handleSuggest = () => {
 
 .template-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); /* 自动填充，更具响应性 */
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); /* 增加最小宽度，让图片在手机上更大 */
+  gap: 16px;
 }
 
 @media (min-width: 480px) {
@@ -646,8 +653,9 @@ const handleSuggest = () => {
 .template-item span {
   display: block;
   text-align: center;
-  padding: 8px;
-  font-size: 0.9rem;
+  padding: 10px 8px;
+  font-size: 1rem; /* 增加字号 */
+  font-weight: 500;
 }
 
 .upload-area {
@@ -812,9 +820,10 @@ const handleSuggest = () => {
 }
 
 .sub-hint {
-  font-size: 0.85rem;
+  font-size: 0.95rem; /* 增加字号 */
   color: var(--text-muted);
-  margin-bottom: 10px;
+  margin-bottom: 12px;
+  line-height: 1.5;
 }
 
 .face-list {

@@ -18,6 +18,15 @@ from datetime import datetime
 
 router = APIRouter()
 
+@router.get("/config")
+async def get_config():
+    """获取前端公用配置，实现前后端环境变量统一"""
+    return {
+        "credits_per_photoshoot": CREDITS_PER_PHOTOSHOOT,
+        "ai_image_quality": AI_IMAGE_QUALITY,
+        "ai_image_size": AI_IMAGE_SIZE
+    }
+
 class PhotoshootRequest(BaseModel):
     template_id: Optional[str] = None
     image_url: Optional[str] = None # 改为可选：如果不传则为纯模板生成模式
