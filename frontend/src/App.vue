@@ -45,29 +45,34 @@ body {
 }
 
 .app-container {
-  max-width: 600px;
+  width: 100%;
+  max-width: 500px; /* 更加适配主流 H5 宽度 */
   margin: 0 auto;
-  min-height: 100vh;
+  min-height: 100dvh; /* 动态视口高度，解决移动端浏览器工具栏遮挡问题 */
+  display: flex;
+  flex-direction: column;
   position: relative;
-  padding-bottom: 70px; /* 为导航栏留出空间 */
+  background-color: var(--bg-dark);
 }
 
 .tab-bar {
   position: fixed;
-  bottom: 10px;
+  bottom: 0; /* 贴合底部 */
   left: 50%;
   transform: translateX(-50%);
-  width: calc(100% - 40px);
-  max-width: 560px;
-  height: 60px;
+  width: 100%;
+  max-width: 500px; /* 与容器一致 */
+  height: calc(65px + env(safe-area-inset-bottom)); /* 适配 iOS 刘海屏底部安全区 */
+  padding-bottom: env(safe-area-inset-bottom);
   display: flex;
   justify-content: space-around;
   align-items: center;
-  border-radius: 20px;
   z-index: 1000;
+  background: rgba(30, 41, 59, 0.8);
   backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.3);
+  -webkit-backdrop-filter: blur(20px); /* 兼容 Chrome/Safari 移动端 */
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
 }
 
 .tab-item {
@@ -76,18 +81,23 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  transition: all 0.3s;
-  padding: 8px 12px;
-  border-radius: 12px;
+  justify-content: center;
+  flex: 1;
+  height: 100%;
+  transition: all 0.2s;
 }
 
-.tab-item:hover, .router-link-active {
+.tab-item:active {
+  transform: scale(0.9);
+}
+
+.router-link-active {
   color: var(--primary-color);
-  background: rgba(99, 102, 241, 0.1);
 }
 
 .tab-label {
-  font-size: 0.8rem;
-  font-weight: bold;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-top: 4px;
 }
 </style>

@@ -10,11 +10,19 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function init() {
     loading.value = true
-    const { data: { session } } = await supabase.auth.getSession()
-    user.value = session?.user || null
-    
-    if (session?.access_token) {
-        localStorage.setItem('token', session.access_token)
+    try {
+        const { data, error } = await supabase.auth.getSession()
+        if (error) throw error
+        
+        const session = data?.session
+        user.value = session?.user || null
+        
+        if (session?.access_token) {
+            localStorage.setItem('token', session.access_token)
+        }
+    } catch (e) {
+        console.error('Auth initialization failed:', e)
+        user.value = null
     }
 
     // 监听状态变化

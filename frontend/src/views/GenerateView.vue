@@ -209,16 +209,21 @@ const submitTask = async () => {
     const res = await api.post('/api/photoshoot/generate', payload)
     taskId.value = res.data.task_id
     resultImages.value = [] // 立即重置旧图片，显示新占位符
+    errorMessage.value = '' // 重置错误信息
     ElMessage.success('任务已提交，正在修图中...')
     startPolling(res.data.task_id)
   } catch (err) {
-    ElMessage.error('开启任务失败')
+    const msg = err.response?.data?.detail || '开启任务失败，请稍后重试'
+    ElMessage.error(msg)
+    errorMessage.value = msg
+    taskStatus.value = 'failed'
     isGenerating.value = false
   }
 }
 
 const pollTimer = ref(null)
 const taskStatus = ref('')
+const errorMessage = ref('')
 const resultImages = ref([])
 
 const startPolling = (tid) => {
@@ -243,7 +248,8 @@ const startPolling = (tid) => {
         ElMessage.success('全组照片约拍完成！')
         stopPolling()
       } else if (data.status === 'failed') {
-        ElMessage.error(data.error_message || '任务失败')
+        errorMessage.value = data.error_message || '任务生成失败，请重试'
+        ElMessage.error(errorMessage.value)
         stopPolling()
       }
     } catch (err) {
@@ -366,7 +372,7 @@ const handleSuggest = () => {
 
       <!-- 自定义参考图上传区 -->
       <div v-show="activeTab === 'custom'" class="custom-ref-area">
-        <p class="sub-hint">上传你想要换脸的模特底图（最多 5 张）。</p>
+        <p class="sub-hint">上传你想要换脸的模特底图（最多 5 张，禁止上传违规图片或过份性感图片）。</p>
         <div class="ref-list">
           <div v-for="(img, idx) in referenceImages" :key="idx" class="ref-item">
             <el-image :src="img" fit="cover" class="ref-img"></el-image>
@@ -486,8 +492,20 @@ const handleSuggest = () => {
       </el-button>
     </div>
 
-    <div v-if="taskStatus === 'completed' || taskStatus === 'processing'" class="result-section glass-card">
-      <h2>3. 约拍成果 <el-tag v-if="taskStatus === 'processing'" type="warning" size="small">正在拍摄中 ({{ resultImages.length }}/{{ activeTab === 'custom' ? referenceImages.length : imageCount }})</el-tag></h2>
+    <div v-if="taskStatus" class="result-section glass-card">
+      <div v-if="taskStatus === 'failed'" class="error-container">
+        <el-alert
+          :title="errorMessage"
+          type="error"
+          description="您可以检查上传的图片是否清晰，或者稍后重新提交任务。"
+          show-icon
+          :closable="false"
+        />
+      </div>
+      <h2>3. 约拍成果 
+        <el-tag v-if="taskStatus === 'processing'" type="warning" size="small">正在拍摄中 ({{ resultImages.length }}/{{ activeTab === 'custom' ? referenceImages.length : imageCount }})</el-tag>
+        <el-tag v-else-if="taskStatus === 'failed'" type="danger" size="small">生成出错</el-tag>
+      </h2>
       <div class="result-grid">
         <!-- 已完成的图片 -->
         <div v-for="(url, index) in resultImages" :key="url" class="result-item">
@@ -689,6 +707,10 @@ const handleSuggest = () => {
   padding: 20px;
   margin-top: 24px;
   animation: fadeIn 0.5s ease;
+}
+
+.error-container {
+  margin-bottom: 20px;
 }
 
 .result-grid {
