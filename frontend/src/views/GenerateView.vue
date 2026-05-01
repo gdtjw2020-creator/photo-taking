@@ -543,9 +543,11 @@ const handleSuggest = () => {
 
 <style scoped>
 .generate-container {
-  padding: 20px;
-  max-width: 600px; /* 限制宽度，在手机上自适应，在电脑上居中 */
+  padding: 16px;
+  width: 100%;
+  max-width: 1000px; /* 进一步增加最大宽度以适配 PC 展示 */
   margin: 0 auto;
+  box-sizing: border-box;
 }
 
 .step-card {
@@ -561,8 +563,14 @@ const handleSuggest = () => {
 
 .template-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); /* 自动填充，更具响应性 */
   gap: 12px;
+}
+
+@media (min-width: 480px) {
+  .template-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  }
 }
 
 .template-item {
@@ -581,7 +589,7 @@ const handleSuggest = () => {
 
 .template-img-container {
   width: 100%;
-  height: 120px;
+  aspect-ratio: 3/4; /* 使用比例取代固定高度 */
   position: relative;
 }
 
@@ -619,7 +627,7 @@ const handleSuggest = () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 156px; /* 120px img + padding/text */
+  aspect-ratio: 3/4; /* 与其它项保持一致 */
 }
 
 .suggest-content {
@@ -715,7 +723,7 @@ const handleSuggest = () => {
 
 .result-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 12px;
   margin-bottom: 20px;
 }
@@ -745,13 +753,17 @@ const handleSuggest = () => {
   border-radius: 8px;
 }
 
-/* 适配大屏幕，让结果网格更宽一些 */
+/* 适配大屏幕，让结果网格和高度动态调整 */
 @media (min-width: 768px) {
   .result-grid {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   }
   .result-item {
-    height: 320px;
+    height: 300px;
+  }
+  .template-item span {
+    font-size: 1rem;
+    padding: 12px;
   }
 }
 

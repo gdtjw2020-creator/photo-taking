@@ -48,6 +48,8 @@ const startPhotoshoot = () => {
 .home-container {
   padding: 16px;
   width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
   box-sizing: border-box;
 }
 

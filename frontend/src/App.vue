@@ -46,7 +46,7 @@ body {
 
 .app-container {
   width: 100%;
-  max-width: 500px; /* 更加适配主流 H5 宽度 */
+  max-width: 1000px; /* 增加最大宽度以适配 PC 展示 */
   margin: 0 auto;
   min-height: 100dvh; /* 动态视口高度，解决移动端浏览器工具栏遮挡问题 */
   display: flex;
@@ -61,7 +61,7 @@ body {
   left: 50%;
   transform: translateX(-50%);
   width: 100%;
-  max-width: 500px; /* 与容器一致 */
+  max-width: 1000px; /* 与容器一致 */
   height: calc(65px + env(safe-area-inset-bottom)); /* 适配 iOS 刘海屏底部安全区 */
   padding-bottom: env(safe-area-inset-bottom);
   display: flex;

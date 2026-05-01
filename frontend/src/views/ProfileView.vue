@@ -12,6 +12,7 @@ const isLoggedIn = computed(() => authStore.isLoggedIn)
 
 const user = ref({
   username: '女神体验官',
+  email: '',
   credits: 0,
   avatar: 'https://placehold.co/100x100/png?text=Avatar'
 })
@@ -27,6 +28,7 @@ onMounted(async () => {
     const profileRes = await api.get('/api/user/profile')
     user.value = {
       username: profileRes.data.username || authStore.user?.email?.split('@')[0] || '女神用户',
+      email: authStore.user?.email || '',
       credits: profileRes.data.credits,
       avatar: profileRes.data.avatar_url || user.value.avatar
     }
@@ -80,7 +82,8 @@ const goToLogin = () => {
       <el-avatar :size="80" :src="user.avatar"></el-avatar>
       <div v-if="isLoggedIn" class="user-info">
         <h3>{{ user.username }}</h3>
-        <p class="credits">剩余积分: <span>{{ user.credits }}</span></p>
+        <p class="user-email">{{ user.email }}</p>
+        <p class="credits">可用余额: <span>{{ user.credits }}</span> 积分</p>
       </div>
       <div v-else class="user-info">
         <h3>访客模式</h3>
@@ -168,13 +171,20 @@ const goToLogin = () => {
 }
 
 .user-info h3 {
-  margin: 0 0 8px 0;
+  margin: 0 0 4px 0;
   font-size: 1.4rem;
+}
+
+.user-email {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin: 0 0 12px 0;
+  opacity: 0.8;
 }
 
 .credits {
   font-size: 0.9rem;
-  color: var(--text-muted);
+  color: #fff;
 }
 
 .credits span {
