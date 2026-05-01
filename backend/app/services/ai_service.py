@@ -77,10 +77,10 @@ class AIService:
             # 1. 准备请求参数 (遵循官方 Demo 最佳实践: DALL-E 3/gpt-image-2 JSON 模式)
             # 根据 Demo (app/api/photobooth/route.ts)，gpt-image-2 在 JSON 模式下支持 images 数组
             images_input = []
-            if input_url:
-                images_input.append({"image_url": input_url})
             if ref_url:
                 images_input.append({"image_url": ref_url})
+            if input_url:
+                images_input.append({"image_url": input_url})
 
             # 2. 准备增强提示词 (从 Demo 借鉴的输出要求，有助于保持一致性)
             output_requirements = "Output requirements: preserve the exact people, poses, facial expressions, and scene composition as faithfully as possible."
@@ -250,23 +250,23 @@ class AIService:
             image_bytes_list = []
             
             async with httpx.AsyncClient(timeout=30.0) as client:
-                # 下载图1 (人脸图)
-                if input_url:
-                    resp1 = await client.get(input_url)
-                    if resp1.status_code == 200:
-                        image_bytes_list.append(resp1.content)
-                        print(f"✅ [任务#{job_no}] 图1(人脸)下载成功")
-                    else:
-                        print(f"⚠️ [任务#{job_no}] 图1下载失败: {resp1.status_code}")
-                
-                # 下载图2 (动作参考图)
+                # 下载图1 (动作参考图/底图) - 物理位置必须在第一位 (image_0)
                 if ref_url:
                     resp2 = await client.get(ref_url)
                     if resp2.status_code == 200:
                         image_bytes_list.append(resp2.content)
-                        print(f"✅ [任务#{job_no}] 图2(参考)下载成功")
+                        print(f"✅ [任务#{job_no}] 图1(底图)下载成功")
                     else:
-                        print(f"⚠️ [任务#{job_no}] 图2下载失败: {resp2.status_code}")
+                        print(f"⚠️ [任务#{job_no}] 图1下载失败: {resp2.status_code}")
+
+                # 下载图2 (人脸图) - 物理位置必须在第二位 (image_1)
+                if input_url:
+                    resp1 = await client.get(input_url)
+                    if resp1.status_code == 200:
+                        image_bytes_list.append(resp1.content)
+                        print(f"✅ [任务#{job_no}] 图2(人脸)下载成功")
+                    else:
+                        print(f"⚠️ [任务#{job_no}] 图2下载失败: {resp1.status_code}")
 
             # 1. 提交任务
             ext_id = await self._submit_task(image_bytes_list, prompt)
