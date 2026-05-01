@@ -372,7 +372,7 @@ const handleSuggest = () => {
 
       <!-- 自定义参考图上传区 -->
       <div v-show="activeTab === 'custom'" class="custom-ref-area">
-        <p class="sub-hint">上传你想要换脸的模特底图（最多 5 张，禁止上传违规图片或过份性感图片）。</p>
+        <p class="sub-hint">上传你想要换脸的模特底图（最多 5 张，禁止上传违规图片或过份性感图片，如果换脸失败请重试一，二次）。</p>
         <div class="ref-list">
           <div v-for="(img, idx) in referenceImages" :key="idx" class="ref-item">
             <el-image :src="img" fit="cover" class="ref-img"></el-image>
