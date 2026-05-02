@@ -74,6 +74,31 @@ const handleLogout = async () => {
 const goToLogin = () => {
     router.push('/login')
 }
+
+const checkAuth = (msg = '请先登录后进行操作') => {
+  if (!isLoggedIn.value) {
+    ElMessageBox.confirm(
+      msg,
+      '登录提醒',
+      {
+        confirmButtonText: '立即登录',
+        cancelButtonText: '先看看',
+        type: 'info',
+        center: true,
+        roundButton: true
+      }
+    ).then(() => {
+      router.push(`/login?redirect=${encodeURIComponent(router.currentRoute.value.fullPath)}`)
+    }).catch(() => {})
+    return false
+  }
+  return true
+}
+
+const openRedeemDialog = () => {
+    if (!checkAuth('兑换积分卡密前需要登录，以便存入您的账户')) return
+    redeemDialogVisible.value = true
+}
 </script>
 
 <template>
@@ -92,11 +117,16 @@ const goToLogin = () => {
     </div>
 
     <div class="recharge-section">
-      <el-button type="primary" plain class="full-width" @click="redeemDialogVisible = true">充值积分卡密</el-button>
-      <p class="recharge-hint">
-        可加微信gdtangjunwu或在“面包多”平台购买激活码进行充值 
-        <a href="https://mbd.pub/o/author-bWuYlGxpZw==/work" target="_blank" class="buy-link">立即前往</a>
-      </p>
+      <el-button type="primary" plain class="full-width" @click="openRedeemDialog">充值积分卡密</el-button>
+      <div class="qr-recharge">
+        <el-image 
+          src="/src/assets/单人二维码.png" 
+          class="recharge-qr"
+          :preview-src-list="['/src/assets/单人二维码.png']"
+          fit="contain"
+        ></el-image>
+        <p class="recharge-tip">扫码添加企业微信<br>联系客服人工充值 / 获取激活码</p>
+      </div>
     </div>
 
     <div v-if="isLoggedIn" class="section-title">积分明细</div>
@@ -245,27 +275,37 @@ const goToLogin = () => {
 }
 
 .recharge-section {
-  margin-bottom: 20px;
+  margin-top: 24px;
+  margin-bottom: 24px;
   text-align: center;
 }
 
-.recharge-hint {
-  font-size: 0.8rem;
+.qr-recharge {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 20px;
+  border-radius: 16px;
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+}
+
+.recharge-qr {
+  width: 160px;
+  height: 160px;
+  border-radius: 8px;
+  background: #fff;
+  padding: 8px;
+}
+
+.recharge-tip {
+  margin-top: 12px;
+  font-size: 0.85rem;
   color: var(--text-muted);
-  margin-top: 8px;
+  line-height: 1.6;
 }
 
-.buy-link {
-  color: var(--primary-color);
-  text-decoration: none;
-  font-weight: bold;
-  margin-left: 4px;
-  border-bottom: 1px solid var(--primary-color);
-}
-
-.buy-link:hover {
-  opacity: 0.8;
-}
 
 .redeem-body {
     padding: 10px 0;
