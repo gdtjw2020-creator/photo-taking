@@ -108,7 +108,7 @@ const goToLogin = () => {
     <div class="recharge-section">
       <el-button type="primary" plain class="full-width" @click="redeemDialogVisible = true">充值积分卡密</el-button>
       <p class="recharge-hint">
-        可在“面包多”平台购买激活码进行充值 
+        可加微信gdtangjunwu或在“面包多”平台购买激活码进行充值 
         <a href="https://mbd.pub/o/author-bWuYlGxpZw==/work" target="_blank" class="buy-link">立即前往</a>
       </p>
     </div>

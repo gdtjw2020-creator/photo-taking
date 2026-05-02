@@ -208,6 +208,42 @@ class SupabaseService:
             print(f"[ERROR] Error appending task output: {e}")
             return False
 
+    def remove_task_output(self, user_id: str, task_id: str, image_url: str):
+        """从任务输出列表中移除一张图片。如果列表为空，则删除整个任务。"""
+        # 更新本地缓存
+        if task_id in _local_task_cache:
+            if "output_urls" in _local_task_cache[task_id]:
+                try:
+                    _local_task_cache[task_id]["output_urls"].remove(image_url)
+                except ValueError:
+                    pass
+        
+        if not self.supabase:
+            return True
+            
+        try:
+            # 1. 获取现有任务
+            res = self.supabase.table("photoshoot_tasks").select("*").eq("id", task_id).eq("user_id", user_id).execute()
+            if not res.data:
+                return False
+                
+            task = res.data[0]
+            current_urls = task.get("output_urls") or []
+            
+            if image_url in current_urls:
+                current_urls.remove(image_url)
+                
+                if not current_urls:
+                    # 如果没有图片了，直接删除任务记录
+                    self.supabase.table("photoshoot_tasks").delete().eq("id", task_id).execute()
+                else:
+                    # 否则更新列表
+                    self.supabase.table("photoshoot_tasks").update({"output_urls": current_urls}).eq("id", task_id).execute()
+            return True
+        except Exception as e:
+            print(f"[ERROR] Error removing task output: {e}")
+            return False
+
     def get_all_templates(self):
         """获取所有可用模板"""
         if not self.supabase:

@@ -20,7 +20,7 @@ onMounted(() => {
         <span class="tab-label">首页</span>
       </router-link>
       <router-link to="/generate" class="tab-item">
-        <span class="tab-label">开始约拍</span>
+        <span class="tab-label">约拍</span>
       </router-link>
       <router-link to="/gallery" class="tab-item">
         <span class="tab-label">相册</span>

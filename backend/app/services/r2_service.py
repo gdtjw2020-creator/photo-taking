@@ -9,6 +9,7 @@ from ..config import (
     R2_CUSTOM_DOMAIN
 )
 import os
+import traceback
 
 class R2Service:
     def __init__(self):
@@ -29,7 +30,8 @@ class R2Service:
                 return f"https://{R2_CUSTOM_DOMAIN}/{object_name}"
             return f"{R2_ENDPOINT_URL}/{R2_BUCKET_NAME}/{object_name}"
         except Exception as e:
-            print(f"Error uploading to R2: {e}")
+            print(f"[R2 ERROR] upload_file failed: {type(e).__name__}: {e}")
+            traceback.print_exc()
             return None
 
     def upload_content(self, content: bytes, object_name: str, content_type: str = "image/png"):

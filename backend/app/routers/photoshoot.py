@@ -8,6 +8,7 @@ import os
 import shutil
 import asyncio
 import random
+import traceback
 from ..services.r2_service import r2_service
 from ..services.ai_service import ai_service
 from ..services.supabase_service import supabase_service
@@ -35,6 +36,7 @@ class PhotoshootRequest(BaseModel):
     is_face_swap: bool = False     # 显式指定是否换脸
     quality: str = AI_IMAGE_QUALITY      # 读取 .env 中的质量配置 (auto, high, medium, low)
     size: str = AI_IMAGE_SIZE            # 读取 .env 中的尺寸配置
+    watermark: bool = True               # 是否添加"AI生成"水印，默认开启
 
 class PhotoshootResponse(BaseModel):
     task_id: str
@@ -60,6 +62,17 @@ async def get_active_task(user_id: str = Depends(get_user_id)):
     """获取用户当前正在进行的活跃任务"""
     return supabase_service.get_latest_active_task(user_id)
 
+class GalleryDeleteRequest(BaseModel):
+    url: str
+
+@router.delete("/gallery/{task_id}")
+async def delete_gallery_item(task_id: str, request: GalleryDeleteRequest, user_id: str = Depends(get_user_id)):
+    """从作品集中删除一张图片"""
+    success = supabase_service.remove_task_output(user_id, task_id, request.url)
+    if not success:
+        raise HTTPException(status_code=500, detail="删除失败")
+    return {"status": "success"}
+
 @router.post("/faces")
 async def save_face(request: FaceSaveRequest, user_id: str = Depends(get_user_id)):
     """保存人脸档案"""
@@ -83,28 +96,57 @@ async def upload_photo(
     active: bool = Depends(check_service_active)
 ):
     """上传照片到 R2"""
-    temp_dir = "temp_uploads"
-    if not os.path.exists(temp_dir):
-        os.makedirs(temp_dir)
-        
+    print(f"[UPLOAD] Received file: filename={file.filename}, content_type={file.content_type}, user_id={user_id}")
+
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="未选择文件或文件名为空")
+
     file_ext = os.path.splitext(file.filename)[1]
-    temp_filename = f"{uuid.uuid4()}{file_ext}"
-    temp_path = os.path.join(temp_dir, temp_filename)
-    
-    with open(temp_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-    
-    # 上传到 R2
-    today = datetime.now().strftime("%Y%m%d")
-    object_name = f"photoshoots/inputs/{today}/{user_id}/{temp_filename}"
-    r2_url = r2_service.upload_file(temp_path, object_name)
-    
-    os.remove(temp_path)
-    
-    if not r2_url:
-        raise HTTPException(status_code=500, detail="文件上传失败")
-        
-    return {"url": r2_url}
+    if not file_ext:
+        file_ext = ".jpg"
+    if file_ext.lower() not in (".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif"):
+        raise HTTPException(status_code=400, detail=f"不支持的文件格式: {file_ext}")
+
+    temp_dir = "temp_uploads"
+    temp_path = None
+
+    try:
+        if not os.path.exists(temp_dir):
+            os.makedirs(temp_dir, exist_ok=True)
+
+        temp_filename = f"{uuid.uuid4()}{file_ext}"
+        temp_path = os.path.join(temp_dir, temp_filename)
+
+        with open(temp_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        file_size = os.path.getsize(temp_path)
+        print(f"[UPLOAD] Saved temp file: {temp_path} ({file_size} bytes)")
+
+        if file_size == 0:
+            raise HTTPException(status_code=400, detail="上传的文件为空")
+
+        # 上传到 R2
+        today = datetime.now().strftime("%Y%m%d")
+        object_name = f"photoshoots/inputs/{today}/{user_id}/{temp_filename}"
+        print(f"[UPLOAD] Uploading to R2: {object_name}")
+        r2_url = r2_service.upload_file(temp_path, object_name)
+
+        if not r2_url:
+            raise Exception("R2 upload returned None — check R2 credentials, bucket, or network")
+
+        print(f"[UPLOAD] Success: {r2_url}")
+        return {"url": r2_url}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[UPLOAD ERROR] {type(e).__name__}: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"上传失败: {type(e).__name__} — {e}")
+    finally:
+        if temp_path and os.path.exists(temp_path):
+            os.remove(temp_path)
 
 @router.post("/generate", response_model=PhotoshootResponse)
 async def generate_photoshoot(
@@ -149,7 +191,7 @@ async def generate_photoshoot(
     selected_prompts = []
     if request.reference_image_urls:
         # 如果有参考图，优化提示词以更好地触发底层多图换脸
-        selected_prompts = ["使用图片1(image_1)的人脸，保持图片2(image_0)的动作、姿势、服装和背景完全不变。"] * request.image_count
+        selected_prompts = ["使用图片1(image_1)的人脸，保持图片2(image_0)的动作、姿势、服装和背景完全不变。融合后的人脸和身体的比例关系要正确。"] * request.image_count
     else:
         # 否则走旧的模板逻辑
         templates = supabase_service.get_all_templates()
@@ -172,7 +214,8 @@ async def generate_photoshoot(
         selected_prompts,
         request.reference_image_urls,
         request.quality,
-        request.size
+        request.size,
+        request.watermark
     )
     
     return PhotoshootResponse(
@@ -234,7 +277,7 @@ async def get_task_status(task_id: str):
             
     return task
 
-async def process_photoshoot_task(task_id: str, user_id: str, input_url: Optional[str], prompts: List[str], reference_urls: Optional[List[str]] = None, quality: str = "auto", size: str = "auto"):
+async def process_photoshoot_task(task_id: str, user_id: str, input_url: Optional[str], prompts: List[str], reference_urls: Optional[List[str]] = None, quality: str = "auto", size: str = "auto", watermark: bool = True):
     """异步处理约拍任务 (支持逐张生成、实时扣费及 900s 硬超时)"""
     # 1. 更新状态为处理中
     supabase_service.update_task_status(task_id, "processing")
@@ -263,7 +306,7 @@ async def process_photoshoot_task(task_id: str, user_id: str, input_url: Optiona
                                 import base64
                                 header, encoded = external_url.split(",", 1)
                                 content = base64.b64decode(encoded)
-                                watermarked_content = apply_watermark_to_bytes(content)
+                                watermarked_content = apply_watermark_to_bytes(content) if watermark else content
                                 
                                 today = datetime.now().strftime("%Y%m%d")
                                 filename = f"{uuid.uuid4()}.png"
@@ -277,8 +320,7 @@ async def process_photoshoot_task(task_id: str, user_id: str, input_url: Optiona
                                 async with httpx.AsyncClient() as client:
                                     resp = await client.get(external_url, timeout=60.0)
                                     if resp.status_code == 200:
-                                        # 添加半透明水印 (合规要求，20% 透明度)
-                                        watermarked_content = apply_watermark_to_bytes(resp.content)
+                                        watermarked_content = apply_watermark_to_bytes(resp.content) if watermark else resp.content
                                         
                                         # 生成唯一文件名并保存到 R2
                                         today = datetime.now().strftime("%Y%m%d")

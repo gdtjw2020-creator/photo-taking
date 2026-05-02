@@ -19,7 +19,7 @@ VALUES
 ),
 (
   '旗袍韵味', 
-  'https://images.unsplash.com/photo-1578301978018-3005759f48f7?q=80&w=300&h=400&auto=format&fit=crop', 
+  'https://cdn.flashvideos.org/photoshoots/outputs/20260501/5d068c84-f0f4-4d92-848d-3b439df55086/9f495e6c-1eaa-416c-a2ff-edaa759858ba.png?q=80&w=300&h=400&auto=format&fit=crop', 
   ARRAY[
     'Chinese courtyard background, exquisite silk cheongsam, leaning against an ancient red pillar, holding a folding fan half-covering the face, elegant charm, facial features highly restoring reference image',
     'Chinese courtyard background, exquisite silk cheongsam, close-up shot, chin resting on hand looking into the distance, gentle and lovely, precise replication of reference image features',
@@ -27,7 +27,7 @@ VALUES
     'Chinese courtyard background, exquisite silk cheongsam, sitting sideways on a stone bench, adjusting hair hairpin, mottled light and shadow, facial expression restoring reference image',
     'Chinese courtyard background, exquisite silk cheongsam, full-view panoramic view, leaning against a carved window, quiet and beautiful, maintaining identity consistency'
   ],
-  'https://images.unsplash.com/photo-1578301978018-3005759f48f7?q=80&w=1280'
+  'https://cdn.flashvideos.org/photoshoots/outputs/20260501/5d068c84-f0f4-4d92-848d-3b439df55086/9f495e6c-1eaa-416c-a2ff-edaa759858ba.png?q=80&w=1280'
 ),
 (
   '职场精英', 
@@ -43,7 +43,7 @@ VALUES
 ),
 (
   '海边落日', 
-  'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=300&h=400&auto=format&fit=crop', 
+  'https://cdn.flashvideos.org/photoshoots/outputs/20260502/5d068c84-f0f4-4d92-848d-3b439df55086/b82aadfa-1498-4f61-834c-7ee1fa4fb479.png?q=80&w=300&h=400&auto=format&fit=crop', 
   ARRAY[
     'Bali beach background, sunset afterglow golden light, holding skirt running by the waves and looking back, facial features highly restoring reference image',
     'Bali beach background, sunset afterglow golden light, sitting on the sand, fiddling with hair, backlighting outline, face expression consistent with reference image',
@@ -51,7 +51,7 @@ VALUES
     'Bali beach background, sunset afterglow golden light, close-up smile, face stained with fine sand, youthful vibe, maintaining identity consistency',
     'Bali beach background, sunset afterglow golden light, lying sideways in shallow water, sea water washing over dress hem, facial features precisely locked'
   ],
-  'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=1280'
+  'https://cdn.flashvideos.org/photoshoots/outputs/20260502/5d068c84-f0f4-4d92-848d-3b439df55086/b82aadfa-1498-4f61-834c-7ee1fa4fb479.png?q=80&w=1280'
 ),
 (
   '赛博朋克', 

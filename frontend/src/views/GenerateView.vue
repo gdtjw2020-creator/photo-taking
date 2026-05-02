@@ -1,12 +1,14 @@
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElLoading, ElMessageBox } from 'element-plus'
-import { Loading, ZoomIn, Close, Plus } from '@element-plus/icons-vue'
+import { Loading, ZoomIn, Close, Plus, Download } from '@element-plus/icons-vue'
 import api from '../api'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../store/auth'
+import { resizeImageIfNeeded } from '../utils/imageResize'
 
 const route = useRoute()
+const router = useRouter()
 const authStore = useAuthStore()
 const isLoggedIn = computed(() => authStore.isLoggedIn)
 const CREDITS_PER_IMAGE = ref(5) // 默认为 5，之后从后端动态同步
@@ -42,16 +44,16 @@ onMounted(async () => {
           taskId.value = task.id
           taskStatus.value = task.status
           resultImages.value = task.output_urls || []
-          startPolling(task.id)
-          
+          const startTime = task.created_at ? new Date(task.created_at).getTime() : null
           // 如果有正在进行的任务，自动切换到结果视图
           isGenerating.value = true
+          startPolling(task.id, startTime)
       }
     }
     // 处理从“人脸存档”跳转过来的情况
     if (route.query.face_url) {
       uploadedImageUrl.value = route.query.face_url
-      ElMessage.info('已自动装载人脸存档')
+      ElMessage.info('已自动装载形象存档')
     }
   } catch (err) {
     console.error('Failed to init data:', err)
@@ -62,13 +64,14 @@ const selectedTemplate = ref(null)
 const uploadedImageUrl = ref('')
 const referenceImages = ref([]) // 新增：参考图数组
 const isRefUploading = ref(false) // 新增：参考图上传状态
-const activeTab = ref('template') // 新增：当前激活的模式 ('template' 或 'custom')
+const activeTab = ref(route.query.tab || 'template') // 从 URL 初始化当前激活模式
 const imageCount = ref(1) // 默认 1 张
 const isUploading = ref(false)
 const isGenerating = ref(false)
 const autoSaveFace = ref(true) // 默认开启自动保存
 const taskId = ref('')
 const isAgreed = ref(false)
+const addWatermark = ref(true) // 默认添加"AI生成"水印
 const photoshootCounts = [1, 2, 3, 4, 5]
 const previewList = ref([])
 const showViewer = ref(false)
@@ -82,14 +85,38 @@ const selectTemplate = (template) => {
   selectedTemplate.value = template
 }
 
-const handleUpload = async (file) => {
+const handleTabChange = (tab) => {
+  activeTab.value = tab
+  // 同步到 URL，但不产生历史记录
+  router.replace({ query: { ...route.query, tab } })
+}
+
+const checkAuth = (msg = '请先登录后开启您的约拍之旅') => {
   if (!isLoggedIn.value) {
-    ElMessage.warning('请先登录后开始上传照片')
-    return
+    ElMessageBox.confirm(
+      msg,
+      '登录提醒',
+      {
+        confirmButtonText: '立即登录',
+        cancelButtonText: '先看看',
+        type: 'info',
+        center: true,
+        roundButton: true
+      }
+    ).then(() => {
+      router.push(`/login?redirect=${encodeURIComponent(route.fullPath)}`)
+    }).catch(() => {})
+    return false
   }
+  return true
+}
+
+const handleUpload = async (file) => {
+  if (!checkAuth('上传照片前需要登录，以便为您保存形象存档')) return
   isUploading.value = true
   const formData = new FormData()
-  formData.append('file', file.raw)
+  const resizedFile = await resizeImageIfNeeded(file.raw)
+  formData.append('file', resizedFile)
 
   try {
     const res = await api.post('/api/photoshoot/upload', formData, {
@@ -103,20 +130,19 @@ const handleUpload = async (file) => {
       saveCurrentFace()
     }
   } catch (err) {
-    ElMessage.error('上传失败，请重试')
+    const detail = err.response?.data?.detail || '上传失败，请重试'
+    ElMessage.error(detail)
   } finally {
     isUploading.value = false
   }
 }
 
 const handleRefUpload = async (file) => {
-  if (!isLoggedIn.value) {
-    ElMessage.warning('请先登录后开始上传照片')
-    return
-  }
+  if (!checkAuth('上传创作底图前需要登录')) return
   isRefUploading.value = true
   const formData = new FormData()
-  formData.append('file', file.raw)
+  const resizedFile = await resizeImageIfNeeded(file.raw)
+  formData.append('file', resizedFile)
 
   try {
     const res = await api.post('/api/photoshoot/upload', formData, {
@@ -125,7 +151,8 @@ const handleRefUpload = async (file) => {
     referenceImages.value.push(res.data.url)
     ElMessage.success('参考图上传成功')
   } catch (err) {
-    ElMessage.error('上传失败，请重试')
+    const detail = err.response?.data?.detail || '上传失败，请重试'
+    ElMessage.error(detail)
   } finally {
     isRefUploading.value = false
   }
@@ -141,11 +168,11 @@ const saveCurrentFace = async () => {
   try {
     const res = await api.post('/api/photoshoot/faces', {
       face_url: uploadedImageUrl.value,
-      name: `人脸存档 ${savedFaces.value.length + 1}`
+      name: `形象存档 ${savedFaces.value.length + 1}`
     })
     console.log('[DEBUG] Save face success:', res.data)
     savedFaces.value.unshift(res.data)
-    ElMessage.success('已永久保存到人脸存档')
+    ElMessage.success('已永久保存到我的形象库')
   } catch (err) {
     console.error('[DEBUG] Save face error:', err)
     ElMessage.error('保存失败')
@@ -157,19 +184,16 @@ const selectSavedFace = (face) => {
 }
 
 const submitTask = async () => {
-  if (!isLoggedIn.value) {
-    ElMessage.error('请登录后开启约拍任务')
-    return
-  }
+  if (!checkAuth('开启 AI 约拍任务需要登录以扣除积分')) return
   
   if (activeTab.value === 'custom') {
     // 自定义参考图模式
     if (referenceImages.value.length === 0) {
-      ElMessage.warning('请先上传至少一张换脸底图')
+      ElMessage.warning('请先上传至少一张创作底图')
       return
     }
     if (!uploadedImageUrl.value) {
-      ElMessage.warning('请先上传一张人脸正面照片')
+      ElMessage.warning('请先上传您的形象照片')
       return
     }
   } else {
@@ -184,8 +208,8 @@ const submitTask = async () => {
   if (!isAgreed.value) {
     try {
       await ElMessageBox.confirm(
-        '开启 AI 约拍前，请确认您上传的照片已获本人授权，且生成的图片仅用于个人娱乐，不得用于非法用途。确认开启吗？',
-        '法律及隐私确认',
+        '开启 AI 约拍前，请确认您上传的照片已获本人授权，且生成的图片仅用于个人娱乐。系统严禁生成违规、不雅或侵犯他人隐私的内容。确认开启吗？',
+        '合规使用与隐私保护确认',
         {
           confirmButtonText: '确认并自动勾选',
           cancelButtonText: '暂不开启',
@@ -210,7 +234,8 @@ const submitTask = async () => {
       template_id: activeTab.value === 'template' ? selectedTemplate.value.id : null,
       image_url: uploadedImageUrl.value,
       reference_image_urls: activeTab.value === 'custom' ? referenceImages.value : undefined,
-      image_count: activeTab.value === 'custom' ? referenceImages.value.length : imageCount.value
+      image_count: activeTab.value === 'custom' ? referenceImages.value.length : imageCount.value,
+      watermark: addWatermark.value
     }
 
     const res = await api.post('/api/photoshoot/generate', payload)
@@ -232,15 +257,47 @@ const pollTimer = ref(null)
 const taskStatus = ref('')
 const errorMessage = ref('')
 const resultImages = ref([])
+const taskStartTime = ref(null)     // 任务提交时间 (ms)
+const elapsedSeconds = ref(0)       // 已等待秒数
+const MAX_WAIT_SECONDS = 900        // 后端硬超时 15 分钟
 
-const startPolling = (tid) => {
+const formattedElapsed = computed(() => {
+  const mins = Math.floor(elapsedSeconds.value / 60)
+  const secs = elapsedSeconds.value % 60
+  return `${mins} 分 ${secs.toString().padStart(2, '0')} 秒`
+})
+
+const isLongWait = computed(() => elapsedSeconds.value > 300) // 超过 5 分钟提示离开
+
+const startPolling = (tid, existingStartTime = null) => {
   taskStatus.value = 'processing'
+  taskStartTime.value = existingStartTime || Date.now()
+  elapsedSeconds.value = Math.floor((Date.now() - taskStartTime.value) / 1000)
+
+  // 如果恢复的任务已经超过最大等待时间，直接标记失败不再轮询
+  if (elapsedSeconds.value >= MAX_WAIT_SECONDS) {
+    errorMessage.value = `任务已提交超过 ${MAX_WAIT_SECONDS} 秒（15 分钟），已自动超时。请到相册查看是否有已生成的结果，或重新提交。`
+    taskStatus.value = 'failed'
+    isGenerating.value = false
+    return
+  }
+
   pollTimer.value = setInterval(async () => {
     try {
+      elapsedSeconds.value = Math.floor((Date.now() - taskStartTime.value) / 1000)
+
+      if (elapsedSeconds.value >= MAX_WAIT_SECONDS) {
+        errorMessage.value = `已等待超过 ${MAX_WAIT_SECONDS} 秒（15 分钟），任务可能已超时。请稍后到相册查看结果。`
+        ElMessage.warning(errorMessage.value)
+        stopPolling()
+        taskStatus.value = 'failed'
+        return
+      }
+
       const res = await api.get(`/api/photoshoot/task_status?task_id=${tid}`)
       const data = res.data
       taskStatus.value = data.status
-      
+
       // 增量更新已生成的图片
       if (data.output_urls && data.output_urls.length > resultImages.value.length) {
           resultImages.value = data.output_urls
@@ -289,11 +346,6 @@ const downloadImage = (url, index) => {
 const downloadAll = async () => {
   if (resultImages.value.length === 0) return
   
-  if (isMobile.value) {
-    ElMessage.success('移动端请点击图片预览，长按图片即可保存到相册')
-    return
-  }
-
   ElMessage.info('开始下载照片...')
   for (let i = 0; i < resultImages.value.length; i++) {
     await downloadImage(resultImages.value[i], i)
@@ -303,10 +355,7 @@ const downloadAll = async () => {
 }
 
 const handleSuggest = () => {
-    if (!isLoggedIn.value) {
-        ElMessage.warning('请登录后提交您的愿望')
-        return
-    }
+    if (!checkAuth('提交愿望前请先登录')) return
     
     ElMessageBox.prompt('告诉我们您想要什么样的写真风格（如：动漫风、油画质感、赛博猫咪...）', '风格许愿池', {
         confirmButtonText: '提交愿望',
@@ -331,8 +380,8 @@ const handleSuggest = () => {
   <div class="generate-container">
     <div class="step-card glass-card">
       <div class="mode-tabs">
-        <div class="mode-tab" :class="{ active: activeTab === 'template' }" @click="activeTab = 'template'">预设写真风格</div>
-        <div class="mode-tab" :class="{ active: activeTab === 'custom' }" @click="activeTab = 'custom'">自定义换脸图</div>
+        <div class="mode-tab" :class="{ active: activeTab === 'template' }" @click="handleTabChange('template')">预设写真风格</div>
+        <div class="mode-tab" :class="{ active: activeTab === 'custom' }" @click="handleTabChange('custom')">AI 写真定制</div>
       </div>
 
       <div v-show="activeTab === 'template'">
@@ -379,7 +428,7 @@ const handleSuggest = () => {
 
       <!-- 自定义参考图上传区 -->
       <div v-show="activeTab === 'custom'" class="custom-ref-area">
-        <p class="sub-hint">上传你想要换脸的模特底图（最多 5 张，禁止上传违规图片或过份性感图片，如果换脸失败请重试一，二次）。</p>
+        <p class="sub-hint">上传您心仪的创作底图（最多 5 张，请确保内容合规。如生成效果不佳，建议尝试更换底图）。</p>
         <div class="ref-list">
           <div v-for="(img, idx) in referenceImages" :key="idx" class="ref-item">
             <el-image :src="img" fit="cover" class="ref-img"></el-image>
@@ -406,11 +455,11 @@ const handleSuggest = () => {
     </div>
 
     <div class="step-card glass-card">
-      <h2>2. 选择或上传正面照片</h2>
+      <h2>2. 录入您的数字形象</h2>
       
       <!-- 已存人脸存档 -->
       <div v-if="savedFaces.length > 0" class="saved-faces-section">
-        <p class="sub-hint">常用人脸存档：</p>
+        <p class="sub-hint">常用形象存档：</p>
         <div class="face-list">
           <div 
             v-for="face in savedFaces" 
@@ -444,7 +493,7 @@ const handleSuggest = () => {
         </el-upload>
       </div>
       <div v-if="uploadedImageUrl" class="save-face-action">
-        <el-checkbox v-model="autoSaveFace" class="auto-save-cb">自动保存此人脸到存档</el-checkbox>
+        <el-checkbox v-model="autoSaveFace" class="auto-save-cb">自动保存此形象到我的形象库</el-checkbox>
         <el-button 
             v-if="!autoSaveFace && !savedFaces.some(f => f.face_url === uploadedImageUrl)"
             size="small" 
@@ -462,7 +511,7 @@ const handleSuggest = () => {
     <div class="step-card glass-card">
       <h2>3. 约拍数量</h2>
       <div v-if="activeTab === 'custom'" class="custom-ref-mode-hint">
-        <el-alert title="您已开启自定义参考图换脸模式" type="success" :closable="false" show-icon>
+        <el-alert title="您已开启 AI 写真定制模式" type="success" :closable="false" show-icon>
           将为您逐一生成 {{ referenceImages.length || 0 }} 张照片。
         </el-alert>
       </div>
@@ -509,8 +558,32 @@ const handleSuggest = () => {
           :closable="false"
         />
       </div>
-      <h2>3. 约拍成果 
-        <el-tag v-if="taskStatus === 'processing'" type="warning" size="small">正在拍摄中 ({{ resultImages.length }}/{{ activeTab === 'custom' ? referenceImages.length : imageCount }})</el-tag>
+      <div v-if="taskStatus === 'processing'" class="leave-hint">
+        <el-alert
+          title="后台持续生成中，您可以放心离开本页面"
+          type="info"
+          :closable="false"
+          show-icon
+        >
+          <template #default>
+            拍照任务在后台排队生成，不会中断。您可以先去逛其他页面，稍后到 <strong>「相册」</strong> 查看全部成果，或返回本页继续等待。
+          </template>
+        </el-alert>
+      </div>
+      <div v-if="taskStatus === 'processing' && isLongWait" class="leave-hint">
+        <el-alert
+          :title="`已等待 ${formattedElapsed}，不如先去逛逛？`"
+          type="warning"
+          :closable="false"
+          show-icon
+        >
+          <template #default>
+            生成仍在后台进行中（最长 15 分钟），任务结果会自动保存到 <strong>「相册」</strong>。本页超过 15 分钟无结果将自动停止等待。
+          </template>
+        </el-alert>
+      </div>
+      <h2>3. 约拍成果
+        <el-tag v-if="taskStatus === 'processing'" type="warning" size="small">拍摄中 ({{ resultImages.length }}/{{ activeTab === 'custom' ? referenceImages.length : imageCount }}) 已等待 {{ formattedElapsed }}</el-tag>
         <el-tag v-else-if="taskStatus === 'failed'" type="danger" size="small">生成出错</el-tag>
       </h2>
       <div class="result-grid">
@@ -518,32 +591,36 @@ const handleSuggest = () => {
         <div v-for="(url, index) in resultImages" :key="url" class="result-item">
           <el-image 
             :src="url" 
-            :preview-src-list="resultImages" 
+            :preview-src-list="isMobile ? [] : resultImages"
             :initial-index="index"
             :key="url"
             fit="cover"
             preview-teleported
           ></el-image>
+          <div class="result-download-btn" @click.stop="downloadImage(url)">
+            <el-icon><Download /></el-icon>
+          </div>
         </div>
         <!-- 正在生成的占位符 -->
         <div v-for="n in Math.max(0, (activeTab === 'custom' ? referenceImages.length : imageCount) - resultImages.length)" :key="'loading-'+n" class="result-item loading-placeholder" v-if="taskStatus === 'processing'">
             <div class="loading-content">
                 <el-icon class="is-loading"><Loading /></el-icon>
-                <span>正在冲洗...</span>
+                <span>正在冲洗... {{ formattedElapsed }}</span>
             </div>
         </div>
       </div>
       <div class="result-actions">
         <el-button type="success" @click="downloadAll">
-          {{ isMobile ? '保存教程' : '下载全组照片' }}
+          {{ isMobile ? '保存图片' : '下载全组照片' }}
         </el-button>
         <el-button @click="taskStatus = ''">再拍一组</el-button>
       </div>
-      <p v-if="isMobile" class="mobile-hint">提示：移动端支持点击图片进入预览模式，长按即可保存</p>
+      <p v-if="isMobile" class="mobile-hint">提示：长按图片即可保存到相册，或点击图片右下角按钮一键下载</p>
     </div>
 
     <div class="legal-notice">
         <el-checkbox v-model="isAgreed">我已确认照片为本人或已获授权，且仅用于个人娱乐</el-checkbox>
+        <el-checkbox v-model="addWatermark" style="margin-left: 20px">生成图片添加"AI生成"文字水印</el-checkbox>
     </div>
   </div>
 </template>
@@ -717,6 +794,10 @@ const handleSuggest = () => {
 .legal-notice {
     margin-top: 20px;
     text-align: center;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px 24px;
 }
 
 .result-section {
@@ -740,6 +821,30 @@ const handleSuggest = () => {
   border-radius: 12px;
   overflow: hidden;
   height: 240px;
+  position: relative;
+}
+
+.result-download-btn {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+  transition: all 0.2s;
+  z-index: 2;
+}
+
+.result-download-btn:hover {
+  background: var(--primary-color);
+  transform: scale(1.1);
 }
 
 .result-actions {
@@ -749,6 +854,10 @@ const handleSuggest = () => {
 
 .result-actions .el-button {
   flex: 1;
+}
+
+.leave-hint {
+  margin-bottom: 16px;
 }
 
 .mobile-hint {

@@ -63,11 +63,12 @@
 
 <script setup>
 import { ref, reactive } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '../store/auth'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 
 const isLogin = ref(true)
@@ -111,7 +112,8 @@ async function handleSubmit() {
     if (isLogin.value) {
       await authStore.signIn(form.email, form.password)
       ElMessage.success('登录成功')
-      router.push('/')
+      const redirectPath = route.query.redirect || '/'
+      router.push(redirectPath)
     } else {
       await authStore.signUp(form.email, form.password)
       ElMessage.success('注册成功，请查收验证邮件')
