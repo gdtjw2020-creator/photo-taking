@@ -41,7 +41,7 @@ onMounted(() => {
 <template>
   <div class="faces-container">
     <div class="header">
-      <h1>形象存档</h1>
+      <h1>形象</h1>
       <p>管理您的专属形象，永久保存以便随时约拍</p>
     </div>
 
