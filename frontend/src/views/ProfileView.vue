@@ -91,6 +91,14 @@ const goToLogin = () => {
       </div>
     </div>
 
+    <div class="recharge-section">
+      <el-button type="primary" plain class="full-width" @click="redeemDialogVisible = true">充值积分卡密</el-button>
+      <p class="recharge-hint">
+        可加微信gdtangjunwu或在“面包多”平台购买激活码进行充值 
+        <a href="https://mbd.pub/o/author-bWuYlGxpZw==/work" target="_blank" class="buy-link">立即前往</a>
+      </p>
+    </div>
+
     <div v-if="isLoggedIn" class="section-title">积分明细</div>
     <div v-if="isLoggedIn" class="logs-list glass-card">
       <div v-for="log in creditLogs" :key="log.id" class="log-item">
@@ -103,14 +111,6 @@ const goToLogin = () => {
         </div>
       </div>
       <el-empty v-if="creditLogs.length === 0" description="暂无变动明细" :image-size="60"></el-empty>
-    </div>
-
-    <div class="recharge-section">
-      <el-button type="primary" plain class="full-width" @click="redeemDialogVisible = true">充值积分卡密</el-button>
-      <p class="recharge-hint">
-        可加微信gdtangjunwu或在“面包多”平台购买激活码进行充值 
-        <a href="https://mbd.pub/o/author-bWuYlGxpZw==/work" target="_blank" class="buy-link">立即前往</a>
-      </p>
     </div>
 
     <!-- 兑换卡密弹窗 -->

@@ -20,7 +20,7 @@ const fetchFaces = async () => {
 
 const deleteFace = async (faceId) => {
   try {
-    await ElMessageBox.confirm('确定要删除这个人脸存档吗？', '提示', {
+    await ElMessageBox.confirm('确定要删除这个形象存档吗？', '提示', {
       type: 'warning'
     })
     
@@ -41,8 +41,8 @@ onMounted(() => {
 <template>
   <div class="faces-container">
     <div class="header">
-      <h1>人脸存档</h1>
-      <p>管理您的专属人脸，永久保存以便随时约拍</p>
+      <h1>形象存档</h1>
+      <p>管理您的专属形象，永久保存以便随时约拍</p>
     </div>
 
     <div v-loading="isLoading" class="face-grid">
@@ -66,7 +66,7 @@ onMounted(() => {
       </div>
     </div>
 
-    <el-empty v-if="!isLoading && savedFaces.length === 0" description="您还没有保存过人脸档案">
+    <el-empty v-if="!isLoading && savedFaces.length === 0" description="您还没有保存过形象档案">
         <el-button type="primary" @click="$router.push('/generate')">去上传并保存</el-button>
     </el-empty>
   </div>

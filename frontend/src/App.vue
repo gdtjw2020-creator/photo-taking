@@ -26,7 +26,7 @@ onMounted(() => {
         <span class="tab-label">相册</span>
       </router-link>
       <router-link to="/faces" class="tab-item">
-        <span class="tab-label">人脸</span>
+        <span class="tab-label">形象存档</span>
       </router-link>
       <router-link to="/profile" class="tab-item">
         <span class="tab-label">我的</span>

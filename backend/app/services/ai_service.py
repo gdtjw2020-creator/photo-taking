@@ -259,12 +259,12 @@ class AIService:
                     else:
                         print(f"⚠️ [任务#{job_no}] 图1下载失败: {resp2.status_code}")
 
-                # 下载图2 (人脸图) - 物理位置必须在第二位 (image_1)
+                # 下载图2 (形象图) - 物理位置必须在第二位 (image_1)
                 if input_url:
                     resp1 = await client.get(input_url)
                     if resp1.status_code == 200:
                         image_bytes_list.append(resp1.content)
-                        print(f"✅ [任务#{job_no}] 图2(人脸)下载成功")
+                        print(f"✅ [任务#{job_no}] 图2(形象)下载成功")
                     else:
                         print(f"⚠️ [任务#{job_no}] 图2下载失败: {resp1.status_code}")
 

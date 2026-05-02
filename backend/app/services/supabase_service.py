@@ -94,8 +94,8 @@ class SupabaseService:
             print(f"Error fetching gallery: {e}")
             return []
 
-    def save_user_face(self, user_id: str, face_url: str, name: str = "未命名面部"):
-        """保存一个人脸档案"""
+    def save_user_face(self, user_id: str, face_url: str, name: str = "未命名形象"):
+        """保存一个形象档案"""
         if not self.supabase:
             return None
         try:
@@ -109,7 +109,7 @@ class SupabaseService:
             return None
 
     def get_user_faces(self, user_id: str):
-        """获取用户的所有面部档案"""
+        """获取用户的所有形象档案"""
         if not self.supabase:
             return []
         try:
@@ -146,7 +146,7 @@ class SupabaseService:
             return None
 
     def delete_user_face(self, user_id: str, face_id: str):
-        """删除一个人脸档案"""
+        """删除一个形象档案"""
         if not self.supabase:
             return True
         try:

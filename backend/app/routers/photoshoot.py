@@ -45,7 +45,7 @@ class PhotoshootResponse(BaseModel):
 
 class FaceSaveRequest(BaseModel):
     face_url: str
-    name: Optional[str] = "未命名面部"
+    name: Optional[str] = "未命名形象"
 
 @router.get("/gallery")
 async def get_gallery(user_id: str = Depends(get_user_id)):
@@ -54,7 +54,7 @@ async def get_gallery(user_id: str = Depends(get_user_id)):
 
 @router.get("/faces")
 async def get_faces(user_id: str = Depends(get_user_id)):
-    """获取用户保存的人脸档案"""
+    """获取用户保存的形象档案"""
     return supabase_service.get_user_faces(user_id)
 
 @router.get("/active_task")
@@ -75,7 +75,7 @@ async def delete_gallery_item(task_id: str, request: GalleryDeleteRequest, user_
 
 @router.post("/faces")
 async def save_face(request: FaceSaveRequest, user_id: str = Depends(get_user_id)):
-    """保存人脸档案"""
+    """保存形象档案"""
     face = supabase_service.save_user_face(user_id, request.face_url, request.name)
     if not face:
         raise HTTPException(status_code=500, detail="保存失败")
@@ -83,7 +83,7 @@ async def save_face(request: FaceSaveRequest, user_id: str = Depends(get_user_id
 
 @router.delete("/faces/{face_id}")
 async def delete_face(face_id: str, user_id: str = Depends(get_user_id)):
-    """删除人脸档案"""
+    """删除形象档案"""
     success = supabase_service.delete_user_face(user_id, face_id)
     if not success:
         raise HTTPException(status_code=500, detail="删除失败")

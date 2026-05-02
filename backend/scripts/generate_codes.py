@@ -30,4 +30,7 @@ def generate_redeem_codes(count=20, amount=1.5):
 
 if __name__ == "__main__":
     # 你可以修改这里的参数：第一个是生成数量，第二个是每个码的积分面额
-    generate_redeem_codes(20, 1.5)
+    #generate_redeem_codes(10, 11)
+    #generate_redeem_codes(10, 31)
+    #generate_redeem_codes(10, 51)
+    generate_redeem_codes(10, 101)

@@ -31,7 +31,7 @@ onMounted(async () => {
       selectedTemplate.value = templates.value[0]
     }
     
-    // 加载已存人脸 (仅登录用户)
+    // 加载已存形象 (仅登录用户)
     if (isLoggedIn.value) {
       const faceRes = await api.get('/api/photoshoot/faces')
       savedFaces.value = faceRes.data
@@ -50,7 +50,7 @@ onMounted(async () => {
           startPolling(task.id, startTime)
       }
     }
-    // 处理从“人脸存档”跳转过来的情况
+    // 处理从“形象存档”跳转过来的情况
     if (route.query.face_url) {
       uploadedImageUrl.value = route.query.face_url
       ElMessage.info('已自动装载形象存档')
@@ -125,7 +125,7 @@ const handleUpload = async (file) => {
     uploadedImageUrl.value = res.data.url
     ElMessage.success('照片上传成功')
 
-    // 改进：上传成功后立即自动保存到人脸存档
+    // 改进：上传成功后立即自动保存到形象存档
     if (autoSaveFace.value) {
       saveCurrentFace()
     }
@@ -225,7 +225,7 @@ const submitTask = async () => {
 
   isGenerating.value = true
   try {
-    // 如果开启了自动保存，且该人脸尚未在存档中
+    // 如果开启了自动保存，且该形象尚未在存档中
     if (autoSaveFace.value && !savedFaces.value.some(f => f.face_url === uploadedImageUrl.value)) {
         await saveCurrentFace()
     }
@@ -457,7 +457,7 @@ const handleSuggest = () => {
     <div class="step-card glass-card">
       <h2>2. 录入您的数字形象</h2>
       
-      <!-- 已存人脸存档 -->
+      <!-- 已存形象存档 -->
       <div v-if="savedFaces.length > 0" class="saved-faces-section">
         <p class="sub-hint">常用形象存档：</p>
         <div class="face-list">

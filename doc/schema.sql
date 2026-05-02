@@ -49,12 +49,12 @@ CREATE TABLE IF NOT EXISTS public.credit_logs (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 5. 用户面部存档表 (永久保存人脸)
+-- 5. 用户形象存档表 (永久保存形象)
 CREATE TABLE IF NOT EXISTS public.user_faces (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID NOT NULL,
   face_url TEXT NOT NULL,
-  name TEXT DEFAULT '未命名面部',
+  name TEXT DEFAULT '未命名形象',
   is_favorite BOOLEAN DEFAULT false,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
