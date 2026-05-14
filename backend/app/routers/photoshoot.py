@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Header, BackgroundTasks, Depends, UploadFile, File
 from fastapi.responses import StreamingResponse
 import httpx
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
 import uuid
 import os
@@ -15,6 +15,7 @@ from ..services.supabase_service import supabase_service
 from ..services.image_utils import add_ai_watermark, apply_watermark_to_bytes
 from ..dependencies import get_user_id, check_service_active
 from ..config import CREDITS_PER_PHOTOSHOOT, AI_IMAGE_QUALITY, AI_IMAGE_SIZE
+from ..data.old_photo_styles import get_old_photo_style, list_old_photo_styles
 from datetime import datetime
 
 router = APIRouter()
@@ -29,6 +30,9 @@ async def get_config():
     }
 
 class PhotoshootRequest(BaseModel):
+    module_type: Optional[str] = None  # classic_style, darkroom_random, reference_shoot
+    style_id: Optional[str] = None
+    prompt_mode: Optional[str] = None  # similar, strict, creative
     template_id: Optional[str] = None
     image_url: Optional[str] = None # 改为可选：如果不传则为纯模板生成模式
     reference_image_urls: Optional[List[str]] = None
@@ -46,6 +50,129 @@ class PhotoshootResponse(BaseModel):
 class FaceSaveRequest(BaseModel):
     face_url: str
     name: Optional[str] = "未命名形象"
+
+VALID_MODULE_TYPES = {"classic_style", "darkroom_random", "reference_shoot"}
+REFERENCE_PROMPT_MODES = {"similar", "strict", "creative"}
+LEGACY_FACE_SWAP_PROMPT = (
+    "The first image is the target scene with a specific pose, clothing, and background. "
+    "The second image is a portrait showing the person whose face should be used. "
+    "Seamlessly replace the face in the first image with the face from the second image. "
+    "Keep the exact pose, body proportions, clothing, hairstyle, background, and lighting "
+    "from the first image completely unchanged. The face replacement must look natural with "
+    "correct skin tone blending, consistent lighting direction, and proper proportional scaling. "
+    "The result should be photorealistic, cinematic quality, 4K."
+)
+
+
+def _safe_image_count(value: Optional[int], default: int = 1, max_count: int = 5) -> int:
+    count = value if isinstance(value, int) else default
+    return min(max(count, 1), max_count)
+
+
+def _build_reference_prompt(prompt_mode: Optional[str]) -> str:
+    mode = prompt_mode if prompt_mode in REFERENCE_PROMPT_MODES else "similar"
+    base = (
+        "The first uploaded image is the target reference for composition, pose, "
+        "clothing style, lighting, background, and visual mood. The second uploaded "
+        "image is the identity reference. Create a realistic photo of the same "
+        "person from the identity reference. Preserve the person's facial identity, "
+        "natural features, age impression, and expression. Avoid distortion, cartoon "
+        "style, illustration style, identity drift, extra people, and text artifacts."
+    )
+    mode_rules = {
+        "strict": (
+            "Match the target reference as closely as possible: composition, pose, "
+            "body orientation, clothing silhouette, lighting direction, and background "
+            "should stay very close to the first image while keeping the second image's identity."
+        ),
+        "similar": (
+            "Follow the target reference's overall style, atmosphere, lighting, and composition, "
+            "but allow natural adjustments so the final portrait looks coherent and realistic."
+        ),
+        "creative": (
+            "Use the target reference as inspiration rather than a strict copy. Keep the same "
+            "mood and era, but freely adapt pose, framing, clothing details, and background for "
+            "a polished realistic portrait."
+        ),
+    }
+    return f"{base} {mode_rules[mode]} Photorealistic, cinematic quality, natural skin texture, 4K."
+
+
+def _select_mvp_prompts(request: PhotoshootRequest) -> Optional[Dict[str, Any]]:
+    """Return prompt selection data for MVP modes, or None for legacy flow."""
+    module_type = request.module_type
+    if not module_type:
+        return None
+
+    if module_type not in VALID_MODULE_TYPES:
+        raise HTTPException(status_code=400, detail=f"不支持的生成模式: {module_type}")
+
+    if module_type in {"classic_style", "darkroom_random"} and not request.image_url:
+        raise HTTPException(status_code=400, detail="请先上传人脸照片")
+
+    if module_type == "classic_style":
+        if not request.style_id:
+            raise HTTPException(status_code=400, detail="请先选择年代风格")
+
+        style = get_old_photo_style(request.style_id)
+        if not style:
+            raise HTTPException(status_code=400, detail=f"未知年代风格: {request.style_id}")
+
+        prompts = style.get("prompts") or []
+        count = min(_safe_image_count(request.image_count, style.get("recommended_count", 1)), len(prompts))
+        selected_prompts = random.sample(prompts, count)
+        return {
+            "image_count": count,
+            "selected_prompts": selected_prompts,
+            "style_id": style["id"],
+            "metadata": {
+                "module_name": "时代艺术照",
+                "style_ids": [style["id"]],
+                "style_names": [style["name"]],
+            },
+        }
+
+    if module_type == "darkroom_random":
+        styles = list_old_photo_styles()
+        requested_count = request.image_count if request.image_count in (3, 6, 9) else 3
+        count = min(requested_count, len(styles))
+        selected_styles = random.sample(styles, count)
+        selected_prompts = [random.choice(style["prompts"]) for style in selected_styles]
+        return {
+            "image_count": count,
+            "selected_prompts": selected_prompts,
+            "style_id": None,
+            "metadata": {
+                "module_name": "暗房盲盒",
+                "requested_count": requested_count,
+                "actual_count": count,
+                "style_ids": [style["id"] for style in selected_styles],
+                "style_names": [style["name"] for style in selected_styles],
+            },
+        }
+
+    if module_type == "reference_shoot":
+        if not request.image_url:
+            raise HTTPException(status_code=400, detail="请先上传人脸照片")
+        if not request.reference_image_urls:
+            raise HTTPException(status_code=400, detail="请先上传参考图")
+
+        refs = request.reference_image_urls[:5]
+        mode = request.prompt_mode if request.prompt_mode in REFERENCE_PROMPT_MODES else "similar"
+        prompt = _build_reference_prompt(mode)
+        return {
+            "image_count": len(refs),
+            "selected_prompts": [prompt] * len(refs),
+            "reference_image_urls": refs,
+            "style_id": None,
+            "metadata": {
+                "module_name": "照着样子拍",
+                "prompt_mode": mode,
+                "reference_count": len(refs),
+            },
+        }
+
+    return None
 
 @router.get("/gallery")
 async def get_gallery(user_id: str = Depends(get_user_id)):
@@ -156,14 +283,28 @@ async def generate_photoshoot(
     active: bool = Depends(check_service_active)
 ):
     """开启约拍任务"""
-    # 0. 确定图片生成数量
-    if request.reference_image_urls:
+    # 0. 确定 MVP 模式 prompt，旧请求保持原逻辑
+    mvp_selection = _select_mvp_prompts(request)
+    task_metadata = {}
+    selected_prompts = []
+    reference_urls = request.reference_image_urls
+    selected_style_id = request.style_id
+
+    if mvp_selection:
+        request.image_count = mvp_selection["image_count"]
+        selected_prompts = mvp_selection["selected_prompts"]
+        reference_urls = mvp_selection.get("reference_image_urls", request.reference_image_urls)
+        selected_style_id = mvp_selection.get("style_id") or request.style_id
+        task_metadata = mvp_selection.get("metadata", {})
+
+    # 1. 确定图片生成数量
+    if not mvp_selection and request.reference_image_urls:
         request.image_count = len(request.reference_image_urls)
         # 限制最多 5 张
         if request.image_count > 5:
             raise HTTPException(status_code=400, detail="最多只能上传 5 张参考图")
             
-    # 1. 余额检查 (提前拦截，防止浪费 AI 资源)
+    # 2. 余额检查 (提前拦截，防止浪费 AI 资源)
     profile = supabase_service.get_user_profile(user_id)
     current_credits = profile.get("credits", 0)
     required_credits = request.image_count * CREDITS_PER_PHOTOSHOOT
@@ -176,30 +317,26 @@ async def generate_photoshoot(
 
     task_id = str(uuid.uuid4())
     
-    # 2. 创建数据库记录
+    # 3. 创建数据库记录
     success = supabase_service.create_task(
         task_id=task_id,
         user_id=user_id,
         template_id=request.template_id if request.template_id and len(request.template_id) > 10 else None,
-        input_url=request.image_url # 此时可以是 None
+        input_url=request.image_url, # 此时可以是 None
+        module_type=request.module_type,
+        style_id=selected_style_id,
+        metadata=task_metadata
     )
     
     if not success:
         print(f"Warning: Failed to create task record for {task_id}")
 
-    # 3. 确定 Prompts 或 Reference URLs
-    selected_prompts = []
-    if request.reference_image_urls:
+    # 4. 旧逻辑：确定 Prompts 或 Reference URLs
+    if selected_prompts:
+        pass
+    elif request.reference_image_urls:
         # 如果有参考图，优化提示词以更好地触发底层多图换脸
-        selected_prompts = [
-            "The first image is the target scene with a specific pose, clothing, and background. "
-            "The second image is a portrait showing the person whose face should be used. "
-            "Seamlessly replace the face in the first image with the face from the second image. "
-            "Keep the exact pose, body proportions, clothing, hairstyle, background, and lighting "
-            "from the first image completely unchanged. The face replacement must look natural with "
-            "correct skin tone blending, consistent lighting direction, and proper proportional scaling. "
-            "The result should be photorealistic, cinematic quality, 4K."
-        ] * request.image_count
+        selected_prompts = [LEGACY_FACE_SWAP_PROMPT] * request.image_count
     else:
         # 否则走旧的模板逻辑
         templates = supabase_service.get_all_templates()
@@ -220,7 +357,7 @@ async def generate_photoshoot(
         user_id,
         request.image_url,
         selected_prompts,
-        request.reference_image_urls,
+        reference_urls,
         request.quality,
         request.size,
         request.watermark
@@ -253,6 +390,21 @@ async def get_templates():
         {"id": "3", "name": "职场精英", "preview": "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=300&h=400&auto=format&fit=crop"},
         {"id": "4", "name": "海边落日", "preview": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=300&h=400&auto=format&fit=crop"},
         {"id": "5", "name": "赛博朋克", "preview": "https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=300&h=400&auto=format&fit=crop"}
+    ]
+
+@router.get("/old_photo_styles")
+async def get_old_photo_styles():
+    """获取唐师傅老照片风格列表，不返回完整 prompt。"""
+    return [
+        {
+            "id": style["id"],
+            "name": style["name"],
+            "description": style["description"],
+            "preview_url": style["preview_url"],
+            "tags": style["tags"],
+            "recommended_count": style["recommended_count"],
+        }
+        for style in list_old_photo_styles()
     ]
 
 @router.get("/task_status")

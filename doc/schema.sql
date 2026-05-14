@@ -35,6 +35,9 @@ CREATE TABLE IF NOT EXISTS public.photoshoot_tasks (
   input_url TEXT,
   output_urls TEXT[], -- 存储生成的多张图片链接
   error_message TEXT,
+  module_type TEXT, -- 模块类型：classic_style / darkroom_random / reference_shoot，旧任务为 NULL
+  style_id TEXT, -- 风格 ID，仅 classic_style / darkroom_random 模式使用
+  metadata JSONB DEFAULT '{}'::jsonb, -- 扩展元数据 JSON
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );

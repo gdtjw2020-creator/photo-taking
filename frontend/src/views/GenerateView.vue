@@ -13,7 +13,38 @@ const authStore = useAuthStore()
 const isLoggedIn = computed(() => authStore.isLoggedIn)
 const CREDITS_PER_IMAGE = ref(5) // 默认为 5，之后从后端动态同步
 
-const templates = ref([])
+// ========== MVP 模式支持 ==========
+const currentMode = computed(() => route.query.mode || null)
+const oldPhotoStyles = ref([])
+const selectedStyle = ref(null)
+const darkroomPackage = ref(3)
+const promptMode = ref('similar')
+
+const pageTitle = computed(() => {
+  const m = { classic_style: '时代艺术照', darkroom_random: '暗房盲盒', reference_shoot: '照着样子拍' }
+  return m[currentMode.value] || 'AI 写真'
+})
+
+const pageSubtitle = computed(() => {
+  const m = {
+    classic_style: '挑一个年代风格，让唐师傅给您拍张旧时光里的肖像',
+    darkroom_random: '交给暗房随机冲洗几张惊喜底片',
+    reference_shoot: '上传一张参考图，唐师傅照着样子给您拍'
+  }
+  return m[currentMode.value] || ''
+})
+
+const expectedCount = computed(() => {
+  if (currentMode.value === 'darkroom_random') return darkroomPackage.value
+  if (currentMode.value === 'reference_shoot') return referenceImages.value.length || 1
+  return selectedCount.value
+})
+
+const submitButtonText = computed(() => {
+  const m = { classic_style: '让唐师傅开拍', darkroom_random: '开启暗房冲洗', reference_shoot: '照着样子拍' }
+  return `${m[currentMode.value] || '开始拍摄'} (${expectedCount.value} 张)`
+})
+
 const savedFaces = ref([])
 
 onMounted(async () => {
@@ -24,11 +55,14 @@ onMounted(async () => {
         CREDITS_PER_IMAGE.value = configRes.data.credits_per_photoshoot
     }
 
-    // 加载模板
-    const tplRes = await api.get('/api/photoshoot/templates')
-    templates.value = tplRes.data
-    if (templates.value.length > 0) {
-      selectedTemplate.value = templates.value[0]
+    // 加载老照片风格
+    if (currentMode.value === 'classic_style' || currentMode.value === 'darkroom_random') {
+      try {
+        const stylesRes = await api.get('/api/photoshoot/old_photo_styles')
+        oldPhotoStyles.value = stylesRes.data
+      } catch (err) {
+        console.error('Failed to load old photo styles:', err)
+      }
     }
     
     // 加载已存形象 (仅登录用户)
@@ -60,35 +94,26 @@ onMounted(async () => {
   }
 })
 
-const selectedTemplate = ref(null)
 const uploadedImageUrl = ref('')
-const referenceImages = ref([]) // 新增：参考图数组
-const isRefUploading = ref(false) // 新增：参考图上传状态
-const activeTab = ref(route.query.tab || 'template') // 从 URL 初始化当前激活模式
-const imageCount = ref(1) // 默认 1 张
+const referenceImages = ref([])
+const selectedCount = ref(1)
+const isRefUploading = ref(false)
 const isUploading = ref(false)
 const isGenerating = ref(false)
-const autoSaveFace = ref(true) // 默认开启自动保存
+const autoSaveFace = ref(true)
 const taskId = ref('')
 const isAgreed = ref(false)
-const addWatermark = ref(true) // 默认添加"AI生成"水印
-const photoshootCounts = [1, 2, 3, 4, 5]
-const previewList = ref([])
-const showViewer = ref(false)
+const addWatermark = ref(true)
 
-const showPreview = (url) => {
-  previewList.value = [url]
-  showViewer.value = true
+const selectOldStyle = (style) => {
+  selectedStyle.value = style
+  if (selectedCount.value > (style.recommended_count || 2)) {
+    selectedCount.value = style.recommended_count || 2
+  }
 }
 
-const selectTemplate = (template) => {
-  selectedTemplate.value = template
-}
-
-const handleTabChange = (tab) => {
-  activeTab.value = tab
-  // 同步到 URL，但不产生历史记录
-  router.replace({ query: { ...route.query, tab } })
+const goBack = () => {
+  router.push('/')
 }
 
 const checkAuth = (msg = '请先登录后开启您的约拍之旅') => {
@@ -185,64 +210,67 @@ const selectSavedFace = (face) => {
 
 const submitTask = async () => {
   if (!checkAuth('开启 AI 约拍任务需要登录以扣除积分')) return
-  
-  if (activeTab.value === 'custom') {
-    // 自定义参考图模式
-    if (referenceImages.value.length === 0) {
-      ElMessage.warning('请先上传至少一张创作底图')
+
+  // ========== MVP 模式校验 ==========
+  if (currentMode.value === 'classic_style') {
+    if (!selectedStyle.value) {
+      ElMessage.warning('请先选择一个年代风格')
       return
     }
     if (!uploadedImageUrl.value) {
-      ElMessage.warning('请先上传您的形象照片')
+      ElMessage.warning('请先上传您的照片')
+      return
+    }
+  } else if (currentMode.value === 'darkroom_random') {
+    if (!uploadedImageUrl.value) {
+      ElMessage.warning('请先上传您的照片')
+      return
+    }
+  } else if (currentMode.value === 'reference_shoot') {
+    if (referenceImages.value.length === 0) {
+      ElMessage.warning('请先上传参考图')
+      return
+    }
+    if (!uploadedImageUrl.value) {
+      ElMessage.warning('请先上传您的人脸照片')
       return
     }
   } else {
-    // 模板模式
-    if (!selectedTemplate.value || !uploadedImageUrl.value) {
-      ElMessage.warning('请先选择模板并上传照片')
+    if (!uploadedImageUrl.value) {
+      ElMessage.warning('请先上传您的照片')
       return
     }
   }
 
-  // 新增：法律声明强制校验
   if (!isAgreed.value) {
     try {
       await ElMessageBox.confirm(
-        '开启 AI 约拍前，请确认您上传的照片已获本人授权，且生成的图片仅用于个人娱乐。系统严禁生成违规、不雅或侵犯他人隐私的内容。确认开启吗？',
-        '合规使用与隐私保护确认',
-        {
-          confirmButtonText: '确认并自动勾选',
-          cancelButtonText: '暂不开启',
-          type: 'info',
-          center: true
-        }
+        '开启拍摄前，请确认您上传的照片已获本人授权，且生成的图片仅用于个人娱乐。',
+        '合规使用确认',
+        { confirmButtonText: '确认', cancelButtonText: '取消', type: 'info', center: true }
       )
       isAgreed.value = true
-    } catch (e) {
-      return // 用户取消
-    }
+    } catch (e) { return }
   }
 
   isGenerating.value = true
   try {
-    // 如果开启了自动保存，且该形象尚未在存档中
     if (autoSaveFace.value && !savedFaces.value.some(f => f.face_url === uploadedImageUrl.value)) {
         await saveCurrentFace()
     }
 
-    const payload = {
-      template_id: activeTab.value === 'template' ? selectedTemplate.value.id : null,
-      image_url: uploadedImageUrl.value,
-      reference_image_urls: activeTab.value === 'custom' ? referenceImages.value : undefined,
-      image_count: activeTab.value === 'custom' ? referenceImages.value.length : imageCount.value,
-      watermark: addWatermark.value
+    const payloads = {
+      classic_style: { module_type: 'classic_style', style_id: selectedStyle.value?.id, image_url: uploadedImageUrl.value, image_count: selectedCount.value, watermark: addWatermark.value },
+      darkroom_random: { module_type: 'darkroom_random', image_url: uploadedImageUrl.value, image_count: darkroomPackage.value, watermark: addWatermark.value },
+      reference_shoot: { module_type: 'reference_shoot', prompt_mode: promptMode.value, image_url: uploadedImageUrl.value, reference_image_urls: referenceImages.value, image_count: referenceImages.value.length || 1, watermark: addWatermark.value }
     }
+    const payload = payloads[currentMode.value] || payloads.classic_style
 
     const res = await api.post('/api/photoshoot/generate', payload)
     taskId.value = res.data.task_id
     resultImages.value = [] // 立即重置旧图片，显示新占位符
     errorMessage.value = '' // 重置错误信息
-    ElMessage.success('任务已提交，正在修图中...')
+    ElMessage.success('任务已提交，唐师傅正在准备...')
     startPolling(res.data.task_id)
   } catch (err) {
     const msg = err.response?.data?.detail || '开启任务失败，请稍后重试'
@@ -265,6 +293,16 @@ const formattedElapsed = computed(() => {
   const mins = Math.floor(elapsedSeconds.value / 60)
   const secs = elapsedSeconds.value % 60
   return `${mins} 分 ${secs.toString().padStart(2, '0')} 秒`
+})
+
+const loadingText = computed(() => {
+  if (resultImages.value.length === 0) {
+    if (elapsedSeconds.value < 15) return '唐师傅正在找底片...'
+    if (elapsedSeconds.value < 30) return '暗房安全灯亮了...'
+    return '显影液开始起作用了...'
+  } else {
+    return `第 ${resultImages.value.length + 1} 张照片快出来了...`
+  }
 })
 
 const isLongWait = computed(() => elapsedSeconds.value > 300) // 超过 5 分钟提示离开
@@ -354,784 +392,399 @@ const downloadAll = async () => {
   }
 }
 
-const handleSuggest = () => {
-    if (!checkAuth('提交愿望前请先登录')) return
-    
-    ElMessageBox.prompt('告诉我们您想要什么样的写真风格（如：动漫风、油画质感、赛博猫咪...）', '风格许愿池', {
-        confirmButtonText: '提交愿望',
-        cancelButtonText: '再想想',
-        inputPlaceholder: '请输入您期待的风格名称或描述',
-        inputValidator: (value) => {
-            if (!value || value.trim().length < 2) return '愿望写得详细一点哦（至少2个字）'
-            return true
-        }
-    }).then(async ({ value }) => {
-        try {
-            await api.post('/api/user/feedback', { content: value, type: 'style_request' })
-            ElMessage.success('愿望已收到！我们会尽快安排研发该风格~')
-        } catch (err) {
-            ElMessage.error('提交失败，请稍后重试')
-        }
-    }).catch(() => {})
-}
+
 </script>
 
 <template>
   <div class="generate-container">
-    <div class="step-card glass-card">
-      <div class="mode-tabs">
-        <div class="mode-tab" :class="{ active: activeTab === 'template' }" @click="handleTabChange('template')">预设写真风格</div>
-        <div class="mode-tab" :class="{ active: activeTab === 'custom' }" @click="handleTabChange('custom')">AI 写真定制</div>
+    <!-- 无模式时：选择拍摄方式 -->
+    <template v-if="!currentMode">
+      <div class="mode-select-header">
+        <p class="mode-kicker">AI OLD PHOTO STUDIO</p>
+        <h1 class="mode-title">选择拍摄方式</h1>
+      </div>
+      <div class="mode-card-grid">
+        <button v-for="s in [{mode:'classic_style',title:'时代艺术照',sub:'挑一个年代，拍张旧时光里的肖像',meta:'8 款经典风格',icon:'🎞️'},{mode:'darkroom_random',title:'暗房盲盒',sub:'交给暗房随机冲洗惊喜底片',meta:'3 / 6 / 9 张套餐',icon:'🎰'},{mode:'reference_shoot',title:'照着样子拍',sub:'上传参考图，照着构图气氛重拍',meta:'参考图 + 人脸图',icon:'📸'}]" :key="s.mode" class="mode-card glass-card" @click="$router.push({query:{mode:s.mode}})">
+          <span class="mode-card-icon">{{ s.icon }}</span>
+          <span class="mode-card-meta">{{ s.meta }}</span>
+          <strong>{{ s.title }}</strong>
+          <span class="mode-card-sub">{{ s.sub }}</span>
+          <span class="mode-card-action">去拍这套 →</span>
+        </button>
+      </div>
+    </template>
+
+    <!-- 有模式时：拍摄流程 -->
+    <template v-else>
+      <!-- 页头 -->
+      <div class="mvp-page-header glass-card">
+        <div class="mvp-header-back" @click="goBack">← 换一种拍法</div>
+        <p class="mvp-kicker">{{ pageTitle }}</p>
+        <h1 class="mvp-title">{{ pageSubtitle }}</h1>
       </div>
 
-      <div v-show="activeTab === 'template'">
-        <div class="template-grid">
-          <div 
-            v-for="tpl in templates" 
-            :key="tpl.id" 
-            class="template-item" 
-            :class="{ active: selectedTemplate?.id === tpl.id }"
-            @click="selectTemplate(tpl)"
-          >
-            <div class="template-img-container">
-              <el-image 
-                :src="tpl.preview" 
-                :alt="tpl.name" 
-                fit="cover"
-                class="template-img"
-              ></el-image>
-              <div class="zoom-btn" @click.stop="showPreview(tpl.preview)">
-                  <el-icon><ZoomIn /></el-icon>
-              </div>
-            </div>
-            <span>{{ tpl.name }}</span>
-          </div>
-
-          <!-- 独立的图片预览器 -->
-          <el-image-viewer 
-              v-if="showViewer" 
-              @close="showViewer = false" 
-              :url-list="previewList" 
-              teleported
-          />
-
-          
-          <!-- 新增：许愿卡片 -->
-          <div class="template-item suggest-item" @click="handleSuggest">
-            <div class="suggest-content">
-              <div class="plus-icon">+</div>
-              <span>想要更多风格？</span>
+      <!-- ===== 时代艺术照 Step 1 ===== -->
+      <div v-if="currentMode === 'classic_style'" class="step-card glass-card">
+        <h2>1. 选择年代风格</h2>
+        <div class="old-style-grid">
+          <div v-for="style in oldPhotoStyles" :key="style.id" class="old-style-item" :class="{ active: selectedStyle?.id === style.id }" @click="selectOldStyle(style)">
+            <div class="old-style-img-container"><div class="old-style-placeholder"><span class="placeholder-era-icon">📷</span></div></div>
+            <div class="old-style-info">
+              <span class="old-style-name">{{ style.name }}</span>
+              <span class="old-style-desc">{{ style.description }}</span>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- 自定义参考图上传区 -->
-      <div v-show="activeTab === 'custom'" class="custom-ref-area">
-        <p class="sub-hint">上传您心仪的创作底图（最多 5 张，请确保内容合规。如生成效果不佳，建议尝试更换底图）。</p>
+      <!-- ===== 暗房盲盒 Step 1 ===== -->
+      <div v-if="currentMode === 'darkroom_random'" class="step-card glass-card">
+        <h2>1. 选择胶卷套餐</h2>
+        <div class="count-selector film-selector">
+          <div class="count-item film-item" :class="{ active: darkroomPackage === 3 }" @click="darkroomPackage = 3">
+            <span class="film-count">3</span>
+            <span class="film-label">体验盲盒</span>
+          </div>
+          <div class="count-item film-item" :class="{ active: darkroomPackage === 6 }" @click="darkroomPackage = 6">
+            <span class="film-count">6</span>
+            <span class="film-label">惊喜盲盒</span>
+          </div>
+          <div class="count-item film-item" :class="{ active: darkroomPackage === 9 }" @click="darkroomPackage = 9">
+            <span class="film-count">9</span>
+            <span class="film-label">豪华大满贯</span>
+          </div>
+        </div>
+        <p class="count-hint">唐师傅随机挑选年代风格，为您冲洗 {{ darkroomPackage }} 张惊喜老照片</p>
+      </div>
+
+      <!-- ===== 照着样子拍 Step 1 ===== -->
+      <div v-if="currentMode === 'reference_shoot'" class="step-card glass-card">
+        <h2>1. 上传参考图</h2>
+        <p class="sub-hint">上传您心仪的参考图，唐师傅会照着构图和气氛给您重拍。</p>
         <div class="ref-list">
           <div v-for="(img, idx) in referenceImages" :key="idx" class="ref-item">
             <el-image :src="img" fit="cover" class="ref-img"></el-image>
-            <div class="del-btn" @click.stop="removeRef(idx)">
-              <el-icon><Close /></el-icon>
-            </div>
+            <div class="del-btn" @click.stop="removeRef(idx)"><el-icon><Close /></el-icon></div>
           </div>
-          
-          <el-upload
-            v-if="referenceImages.length < 5"
-            class="ref-upload-box"
-            action="#"
-            :auto-upload="false"
-            :show-file-list="false"
-            :on-change="handleRefUpload"
-            accept="image/*"
-          >
-            <div class="ref-upload-btn" v-loading="isRefUploading">
-              <el-icon><Plus /></el-icon>
-            </div>
+          <el-upload v-if="referenceImages.length < 3" class="ref-upload-box" action="#" :auto-upload="false" :show-file-list="false" :on-change="handleRefUpload" accept="image/*">
+            <div class="ref-upload-btn" v-loading="isRefUploading"><el-icon><Plus /></el-icon></div>
           </el-upload>
         </div>
       </div>
-    </div>
 
-    <div class="step-card glass-card">
-      <h2>2. 录入您的数字形象</h2>
-      
-      <!-- 已存形象存档 -->
-      <div v-if="savedFaces.length > 0" class="saved-faces-section">
-        <p class="sub-hint">常用形象存档：</p>
-        <div class="face-list">
-          <div 
-            v-for="face in savedFaces" 
-            :key="face.id" 
-            class="face-item"
-            :class="{ active: uploadedImageUrl === face.face_url }"
-            @click="selectSavedFace(face)"
-          >
-            <img :src="face.face_url">
+      <!-- ===== 共享 Step: 上传人脸照 ===== -->
+      <div class="step-card glass-card">
+        <h2>{{ currentMode === 'reference_shoot' ? '2. 上传您的人脸照' : '2. 上传您的照片' }}</h2>
+        <div v-if="savedFaces.length > 0" class="saved-faces-section">
+          <p class="sub-hint">常用形象存档：</p>
+          <div class="face-list">
+            <div v-for="face in savedFaces" :key="face.id" class="face-item" :class="{ active: uploadedImageUrl === face.face_url }" @click="selectSavedFace(face)">
+              <img :src="face.face_url">
+            </div>
           </div>
         </div>
+        <div class="upload-area">
+          <el-upload class="upload-box" drag action="#" :auto-upload="false" :show-file-list="false" :on-change="handleUpload">
+            <div v-if="!uploadedImageUrl" class="upload-placeholder">
+              <div class="el-upload__text">点击或将照片拖拽到此处</div>
+            </div>
+            <div v-else class="preview-box">
+              <img :src="uploadedImageUrl" class="uploaded-img">
+              <div class="change-hint">点击更换照片</div>
+            </div>
+          </el-upload>
+        </div>
+        <div v-if="uploadedImageUrl" class="save-face-action">
+          <el-checkbox v-model="autoSaveFace">自动保存到形象库</el-checkbox>
+        </div>
+        <p class="hint-text">请确保照片面部清晰、光线充足，尽量上传头肩照</p>
       </div>
 
-      <div class="upload-area">
-        <el-upload
-          class="upload-box"
-          drag
-          action="#"
-          :auto-upload="false"
-          :show-file-list="false"
-          :on-change="handleUpload"
-        >
-          <div v-if="!uploadedImageUrl" class="upload-placeholder">
-            <i class="el-icon-upload"></i>
-            <div class="el-upload__text">点击或将照片拖拽到此处</div>
-          </div>
-          <div v-else class="preview-box">
-            <img :src="uploadedImageUrl" class="uploaded-img">
-            <div class="change-hint">点击更换照片</div>
-          </div>
-        </el-upload>
-      </div>
-      <div v-if="uploadedImageUrl" class="save-face-action">
-        <el-checkbox v-model="autoSaveFace" class="auto-save-cb">自动保存此形象到我的形象库</el-checkbox>
-        <el-button 
-            v-if="!autoSaveFace && !savedFaces.some(f => f.face_url === uploadedImageUrl)"
-            size="small" 
-            type="info" 
-            plain 
-            @click="saveCurrentFace"
-            style="margin-left: 10px"
-        >
-          立即保存
-        </el-button>
-      </div>
-      <p class="hint-text">请确保照片面部清晰、光线充足，尽量上传头肩照</p>
-    </div>
-
-    <div class="step-card glass-card">
-      <h2>3. 约拍数量</h2>
-      <div v-if="activeTab === 'custom'" class="custom-ref-mode-hint">
-        <el-alert title="您已开启 AI 写真定制模式" type="success" :closable="false" show-icon>
-          将为您逐一生成 {{ referenceImages.length || 0 }} 张照片。
-        </el-alert>
-      </div>
-      <div v-else>
+      <!-- ===== Step 3: 生成设置 ===== -->
+      <div v-if="currentMode === 'classic_style'" class="step-card glass-card">
+        <h2>3. 拍摄数量</h2>
         <div class="count-selector">
-          <div 
-            v-for="count in photoshootCounts" 
-            :key="count" 
-            class="count-item"
-            :class="{ active: imageCount === count }"
-            @click="imageCount = count"
-          >
-            {{ count }} 张
+          <div v-for="n in [1, 2]" :key="n" class="count-item" :class="{ active: selectedCount === n }" @click="selectedCount = n">
+            {{ n }} 张
           </div>
         </div>
-        <p class="count-hint">选择多张将自动开启“全套摄影手法”：包含全景、特写、侧位等不同视角</p>
+        <p class="count-hint" v-if="selectedStyle">{{ selectedStyle.name }} 风格，每张使用不同拍摄手法</p>
       </div>
-      
-      <div class="total-cost-box">
-        消耗：<span class="cost-value">{{ ((activeTab === 'custom' ? referenceImages.length : imageCount) * CREDITS_PER_IMAGE).toFixed(1) }}</span> 积分
+
+      <div v-if="currentMode === 'reference_shoot'" class="step-card glass-card">
+        <h2>3. 模仿强度</h2>
+        <div class="count-selector">
+          <div class="count-item" :class="{ active: promptMode === 'similar' }" @click="promptMode = 'similar'">
+            神似就行
+          </div>
+          <div class="count-item" :class="{ active: promptMode === 'strict' }" @click="promptMode = 'strict'">
+            严丝合缝
+          </div>
+          <div class="count-item" :class="{ active: promptMode === 'creative' }" @click="promptMode = 'creative'">
+            师傅发挥
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== 积分 + 提交 ===== -->
+      <div class="total-cost-box glass-card">
+        消耗：<span class="cost-value">{{ (expectedCount * CREDITS_PER_IMAGE).toFixed(1) }}</span> 积分
         <span class="cost-unit">({{ CREDITS_PER_IMAGE }} 积分/张)</span>
       </div>
-    </div>
-
-
-    <div class="action-bar">
-      <el-button 
-        type="primary" 
-        class="primary-button large" 
-        :loading="isGenerating"
-        @click="submitTask"
-      >
-        开启 AI 镜像约拍 (生成 {{ activeTab === 'custom' ? referenceImages.length : imageCount }} 张写真)
-      </el-button>
-    </div>
-
-    <div v-if="taskStatus" class="result-section glass-card">
-      <div v-if="taskStatus === 'failed'" class="error-container">
-        <el-alert
-          :title="errorMessage"
-          type="error"
-          description="您可以检查上传的图片是否清晰，或者稍后重新提交任务。"
-          show-icon
-          :closable="false"
-        />
+      <div class="action-bar">
+        <el-button type="primary" class="primary-button large" :loading="isGenerating" @click="submitTask">{{ submitButtonText }}</el-button>
       </div>
-      <div v-if="taskStatus === 'processing'" class="leave-hint">
-        <el-alert
-          title="后台持续生成中，您可以放心离开本页面"
-          type="info"
-          :closable="false"
-          show-icon
-        >
-          <template #default>
-            拍照任务在后台排队生成，不会中断。您可以先去逛其他页面，稍后到 <strong>「相册」</strong> 查看全部成果，或返回本页继续等待。
-          </template>
-        </el-alert>
-      </div>
-      <div v-if="taskStatus === 'processing' && isLongWait" class="leave-hint">
-        <el-alert
-          :title="`已等待 ${formattedElapsed}，不如先去逛逛？`"
-          type="warning"
-          :closable="false"
-          show-icon
-        >
-          <template #default>
-            生成仍在后台进行中（最长 15 分钟），任务结果会自动保存到 <strong>「相册」</strong>。本页超过 15 分钟无结果将自动停止等待。
-          </template>
-        </el-alert>
-      </div>
-      <h2>3. 约拍成果
-        <el-tag v-if="taskStatus === 'processing'" type="warning" size="small">拍摄中 ({{ resultImages.length }}/{{ activeTab === 'custom' ? referenceImages.length : imageCount }}) 已等待 {{ formattedElapsed }}</el-tag>
-        <el-tag v-else-if="taskStatus === 'failed'" type="danger" size="small">生成出错</el-tag>
-      </h2>
-      <div class="result-grid">
-        <!-- 已完成的图片 -->
-        <div v-for="(url, index) in resultImages" :key="url" class="result-item">
-          <el-image 
-            :src="url" 
-            :preview-src-list="isMobile ? [] : resultImages"
-            :initial-index="index"
-            :key="url"
-            fit="cover"
-            preview-teleported
-          ></el-image>
-          <div class="result-download-btn" @click.stop="downloadImage(url)">
-            <el-icon><Download /></el-icon>
+
+      <!-- ===== 结果展示 ===== -->
+      <div v-if="taskStatus" class="result-section glass-card">
+        <div v-if="taskStatus === 'failed'" class="error-container">
+          <el-alert :title="errorMessage" type="error" description="检查图片是否清晰，或稍后重试。" show-icon :closable="false" />
+        </div>
+        <div v-if="taskStatus === 'processing'" class="leave-hint">
+          <el-alert title="后台冲洗中，可放心离开" type="info" :closable="false" show-icon>
+            <template #default>唐师傅的暗房正在加班加点冲洗，稍后到<strong>「相册」</strong>查看。</template>
+          </el-alert>
+        </div>
+        <div v-if="taskStatus === 'processing' && isLongWait" class="leave-hint">
+          <el-alert :title="`已等待 ${formattedElapsed}，不如先逛逛？`" type="warning" :closable="false" show-icon />
+        </div>
+        <h2>取片成果
+          <el-tag v-if="taskStatus === 'processing'" type="warning" size="small">冲洗中 ({{ resultImages.length }}/{{ expectedCount }}) {{ formattedElapsed }}</el-tag>
+          <el-tag v-else-if="taskStatus === 'failed'" type="danger" size="small">出错</el-tag>
+        </h2>
+        <div class="result-grid">
+          <div v-for="(url, index) in resultImages" :key="url" class="result-item">
+            <el-image :src="url" :preview-src-list="isMobile ? [] : resultImages" :initial-index="index" fit="cover" preview-teleported></el-image>
+            <div class="result-download-btn" @click.stop="downloadImage(url)"><el-icon><Download /></el-icon></div>
+          </div>
+          <div v-for="n in Math.max(0, expectedCount - resultImages.length)" :key="'loading-'+n" class="result-item loading-placeholder" v-if="taskStatus === 'processing'">
+            <div class="loading-content"><el-icon class="is-loading"><Loading /></el-icon><span>{{ loadingText }}</span></div>
           </div>
         </div>
-        <!-- 正在生成的占位符 -->
-        <div v-for="n in Math.max(0, (activeTab === 'custom' ? referenceImages.length : imageCount) - resultImages.length)" :key="'loading-'+n" class="result-item loading-placeholder" v-if="taskStatus === 'processing'">
-            <div class="loading-content">
-                <el-icon class="is-loading"><Loading /></el-icon>
-                <span>正在冲洗... {{ formattedElapsed }}</span>
-            </div>
+        <div class="result-actions">
+          <el-button type="success" @click="downloadAll">{{ isMobile ? '保存全部照片' : '下载全组照片' }}</el-button>
+          <el-button @click="taskStatus = ''">再拍一套</el-button>
         </div>
       </div>
-      <div class="result-actions">
-        <el-button type="success" @click="downloadAll">
-          {{ isMobile ? '保存图片' : '下载全组照片' }}
-        </el-button>
-        <el-button @click="taskStatus = ''">再拍一组</el-button>
-      </div>
-      <p v-if="isMobile" class="mobile-hint">提示：长按图片即可保存到相册，或点击图片右下角按钮一键下载</p>
-    </div>
 
-    <div class="legal-notice">
-        <el-checkbox v-model="isAgreed">我已确认照片为本人或已获授权，且仅用于个人娱乐</el-checkbox>
-        <el-checkbox v-model="addWatermark" style="margin-left: 20px">生成图片添加"AI生成"文字水印</el-checkbox>
-    </div>
+      <!-- ===== 法律声明 ===== -->
+      <div class="legal-notice">
+        <el-checkbox v-model="isAgreed">我已确认照片为本人或已获授权</el-checkbox>
+        <el-checkbox v-model="addWatermark" style="margin-left: 20px">添加"AI生成"水印</el-checkbox>
+      </div>
+    </template>
   </div>
 </template>
 
 <style scoped>
 .generate-container {
-  padding: 20px 16px 100px 16px; /* 增加底部间距，为导航栏留出呼吸空间 */
+  padding: 20px 16px 100px;
   width: 100%;
   max-width: 1000px;
   margin: 0 auto;
   box-sizing: border-box;
 }
 
+/* 模式选择页 */
+.mode-select-header { text-align: center; margin: 28px 0 24px; }
+.mode-kicker { margin: 0 0 8px; color: #f7c873; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.12em; }
+.mode-title {
+  font-size: 1.8rem; font-weight: 800;
+  background: linear-gradient(135deg, #fff8e6 0%, #f7c873 48%, #9bd7cb 100%);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: #fff8e6;
+}
+.mode-card-grid { display: grid; gap: 14px; }
+.mode-card {
+  width: 100%; padding: 20px; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px;
+  color: #fff; text-align: left; cursor: pointer; display: grid; gap: 6px;
+  background: linear-gradient(135deg, rgba(91,49,36,0.45), rgba(16,38,43,0.5));
+  transition: all 0.2s;
+}
+.mode-card:hover { transform: translateY(-2px); border-color: rgba(247,200,115,0.48); }
+.mode-card-icon { font-size: 1.8rem; }
+.mode-card-meta { color: #f7c873; font-size: 0.78rem; font-weight: 700; }
+.mode-card strong { font-size: 1.2rem; }
+.mode-card-sub { color: rgba(255,255,255,0.7); font-size: 0.9rem; line-height: 1.5; }
+.mode-card-action { color: #9bd7cb; font-weight: 700; font-size: 0.9rem; justify-self: start; }
+
+/* MVP 页头 */
+.mvp-page-header {
+  text-align: center; padding: 20px; margin-bottom: 20px;
+  background: linear-gradient(135deg, rgba(91,49,36,0.28), rgba(16,38,43,0.42));
+  border: 1px solid rgba(247,200,115,0.22); position: relative;
+}
+.mvp-header-back {
+  position: absolute; left: 16px; top: 14px; color: #9bd7cb; font-size: 0.82rem;
+  cursor: pointer; font-weight: 600; transition: color 0.2s;
+}
+.mvp-header-back:hover { color: #f7c873; }
+.mvp-kicker { margin: 0 0 6px; color: #f7c873; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.1em; }
+.mvp-title { font-size: 1.2rem; font-weight: 600; color: rgba(255,255,255,0.88); margin: 0; }
+
+/* Step cards - 老照相馆风格 */
 .step-card {
-  padding: 24px 20px; /* 增加内边距 */
-  margin-bottom: 30px; /* 增加卡片间距 */
+  padding: 20px; margin-bottom: 20px; animation: fadeIn 0.4s ease;
+  background:
+    linear-gradient(135deg, rgba(91,49,36,0.22), rgba(29,46,45,0.32)),
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.02) 0 1px, transparent 1px 20px);
+  border: 1px solid rgba(247,200,115,0.18);
 }
+h2 { color: #f7c873; font-size: 1.1rem; margin-bottom: 16px; font-weight: 700; }
 
-.step-card h2 {
-  font-size: 1.2rem;
-  margin-bottom: 20px;
-  color: var(--primary-color);
+/* 风格选择 */
+.old-style-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+.old-style-item {
+  border-radius: 12px; overflow: hidden; border: 2px solid transparent; cursor: pointer;
+  transition: all 0.3s; background: rgba(255,255,255,0.05); padding-bottom: 10px;
 }
-
-.template-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); /* 增加最小宽度，让图片在手机上更大 */
-  gap: 16px;
+.old-style-item.active { border-color: #f7c873; box-shadow: 0 0 16px rgba(247,200,115,0.3); background: rgba(247,200,115,0.08); }
+.old-style-item:hover { border-color: rgba(247,200,115,0.4); transform: translateY(-2px); }
+.old-style-img-container { width: 100%; aspect-ratio: 4/5; overflow: hidden; }
+.old-style-placeholder {
+  width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
+  background:
+    radial-gradient(circle at 50% 28%, rgba(213,177,138,0.25) 0 13%, transparent 14%),
+    radial-gradient(ellipse at 50% 78%, rgba(108,63,53,0.2) 0 30%, transparent 31%),
+    linear-gradient(180deg, rgba(99,113,106,0.5), rgba(60,74,72,0.6));
+  filter: sepia(0.4) contrast(0.9);
 }
+.placeholder-era-icon { font-size: 2.2rem; opacity: 0.6; }
+.old-style-info { padding: 8px 10px 4px; display: flex; flex-direction: column; gap: 3px; }
+.old-style-name { font-size: 0.95rem; font-weight: 600; color: #fff; }
+.old-style-desc { font-size: 0.78rem; color: var(--text-muted); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
-@media (min-width: 480px) {
-  .template-grid {
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  }
-}
+/* 暗房胶卷选择 */
+.film-selector { justify-content: center; }
+.film-item { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 16px 12px; }
+.film-count { font-size: 1.8rem; font-weight: 800; color: #f7c873; }
+.film-label { font-size: 0.8rem; color: var(--text-muted); }
+.film-item.active .film-count { color: #fff; }
 
-.template-item {
-  border-radius: 12px;
-  overflow: hidden;
-  border: 2px solid transparent;
-  cursor: pointer;
-  transition: all 0.3s;
-  background: rgba(255, 255, 255, 0.05);
-}
-
-.template-item.active {
-  border-color: var(--primary-color);
-  box-shadow: 0 0 15px rgba(99, 102, 241, 0.4);
-}
-
-.template-img-container {
-  width: 100%;
-  aspect-ratio: 3/4; /* 使用比例取代固定高度 */
-  position: relative;
-}
-
-.template-img {
-  width: 100%;
-  height: 100%;
-}
-
-.zoom-btn {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 28px;
-  height: 28px;
-  background: rgba(0, 0, 0, 0.5);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-size: 1.1rem;
-  backdrop-filter: blur(4px);
-  z-index: 2;
-  transition: all 0.2s;
-}
-
-.zoom-btn:hover {
-  background: var(--primary-color);
-  transform: scale(1.1);
-}
-
-
-.suggest-item {
-  border: 2px dashed rgba(255, 255, 255, 0.1) !important;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  aspect-ratio: 3/4; /* 与其它项保持一致 */
-}
-
-.suggest-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  color: var(--text-muted);
-}
-
-.plus-icon {
-  font-size: 2rem;
-  margin-bottom: 8px;
-  font-weight: 300;
-}
-
-.template-item span {
-  display: block;
-  text-align: center;
-  padding: 10px 8px;
-  font-size: 1rem; /* 增加字号 */
-  font-weight: 500;
-}
-
-.upload-area {
-  margin-bottom: 12px;
-}
-
-.upload-box {
-  width: 100%;
-}
-
+/* 上传区 */
+.upload-area { margin-bottom: 12px; }
+.upload-box { width: 100%; }
+:deep(.el-upload) { width: 100%; }
 :deep(.el-upload-dragger) {
-  background: rgba(255, 255, 255, 0.05);
-  border: 2px dashed rgba(255, 255, 255, 0.1);
-  border-radius: 16px;
-  height: 200px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  width: 100%; height: 220px;
+  background:
+    linear-gradient(135deg, rgba(91,49,36,0.15), rgba(16,38,43,0.2)),
+    repeating-linear-gradient(0deg, rgba(247,200,115,0.03) 0 1px, transparent 1px 24px);
+  border: 2px dashed rgba(247,200,115,0.25); border-radius: 12px; display: flex;
+  align-items: center; justify-content: center; transition: border-color 0.3s;
 }
-
-.preview-box {
-  width: 100%;
-  height: 100%;
-  position: relative;
-}
-
-.uploaded-img {
-  max-width: 100%;
-  max-height: 180px;
-  border-radius: 8px;
-}
-
+:deep(.el-upload-dragger:hover) { border-color: #f7c873; }
+.upload-placeholder { text-align: center; color: var(--text-muted); }
+.preview-box { position: relative; width: 100%; height: 100%; }
+.uploaded-img { width: 100%; height: 100%; object-fit: contain; border-radius: 8px; }
 .change-hint {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: rgba(0, 0, 0, 0.5);
-  padding: 4px;
-  font-size: 0.8rem;
+  position: absolute; bottom: 0; left: 0; right: 0; text-align: center; padding: 8px;
+  background: rgba(0,0,0,0.6); color: #fff; font-size: 0.8rem; border-radius: 0 0 8px 8px;
 }
+.hint-text { font-size: 0.8rem; color: var(--text-muted); text-align: center; margin-top: 8px; }
 
-.hint-text {
-  color: var(--text-muted);
-  font-size: 0.85rem;
-  text-align: center;
-}
-
-.action-bar {
-  margin-top: 32px;
-}
-
-.primary-button.large {
-  width: 100%;
-  padding: 16px;
-  font-size: 1.1rem;
-}
-
-.legal-notice {
-    margin-top: 20px;
-    text-align: center;
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 12px 24px;
-}
-
-.result-section {
-  padding: 20px;
-  margin-top: 24px;
-  animation: fadeIn 0.5s ease;
-}
-
-.error-container {
-  margin-bottom: 20px;
-}
-
-.result-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 12px;
-  margin-bottom: 20px;
-}
-
-.result-item {
-  border-radius: 12px;
-  overflow: hidden;
-  height: 240px;
-  position: relative;
-}
-
-.result-download-btn {
-  position: absolute;
-  bottom: 8px;
-  right: 8px;
-  width: 32px;
-  height: 32px;
-  background: rgba(0, 0, 0, 0.6);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  cursor: pointer;
-  backdrop-filter: blur(4px);
-  transition: all 0.2s;
-  z-index: 2;
-}
-
-.result-download-btn:hover {
-  background: var(--primary-color);
-  transform: scale(1.1);
-}
-
-.result-actions {
-  display: flex;
-  gap: 12px;
-}
-
-.result-actions .el-button {
-  flex: 1;
-}
-
-.leave-hint {
-  margin-bottom: 16px;
-}
-
-.mobile-hint {
-  margin-top: 12px;
-  font-size: 0.8rem;
-  color: var(--primary-color);
-  text-align: center;
-  background: rgba(99, 102, 241, 0.1);
-  padding: 8px;
-  border-radius: 8px;
-}
-
-/* 适配大屏幕，让结果网格和高度动态调整 */
-@media (min-width: 768px) {
-  .result-grid {
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  }
-  .result-item {
-    height: 300px;
-  }
-  .template-item span {
-    font-size: 1rem;
-    padding: 12px;
-  }
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.count-selector {
-  display: flex;
-  gap: 10px;
-}
-
-.count-item {
-  flex: 1;
-  padding: 12px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 2px solid transparent;
-  cursor: pointer;
-  text-align: center;
-  transition: all 0.3s;
-  font-weight: bold;
-}
-
-.count-item.active {
-  border-color: var(--primary-color);
-  background: rgba(99, 102, 241, 0.2);
-  color: #fff;
-}
-
-.count-hint {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  margin-top: 12px;
-  text-align: center;
-}
-
-:deep(.el-checkbox__label) {
-    color: var(--text-muted);
-    font-size: 0.8rem;
-}
-
-.saved-faces-section {
-  margin-bottom: 20px;
-}
-
-.sub-hint {
-  font-size: 0.95rem; /* 增加字号 */
-  color: var(--text-muted);
-  margin-bottom: 12px;
-  line-height: 1.5;
-}
-
-.face-list {
-  display: flex;
-  gap: 12px;
-  overflow-x: auto;
-  padding-bottom: 8px;
-}
-
+/* 人脸存档 */
+.saved-faces-section { margin-bottom: 16px; }
+.sub-hint { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 12px; }
+.face-list { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 8px; }
 .face-item {
-  flex-shrink: 0;
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
-  overflow: hidden;
-  border: 2px solid transparent;
-  cursor: pointer;
-  transition: all 0.3s;
+  flex-shrink: 0; width: 56px; height: 56px; border-radius: 50%; overflow: hidden;
+  border: 2px solid transparent; cursor: pointer; transition: all 0.3s;
 }
+.face-item.active { border-color: #f7c873; box-shadow: 0 0 10px rgba(247,200,115,0.4); }
+.face-item img { width: 100%; height: 100%; object-fit: cover; }
+.save-face-action { text-align: center; margin-top: 10px; }
 
-.face-item.active {
-  border-color: var(--primary-color);
-  box-shadow: 0 0 10px rgba(99, 102, 241, 0.5);
+/* 数量选择 */
+.count-selector { display: flex; gap: 10px; }
+.count-item {
+  flex: 1; padding: 12px; border-radius: 12px;
+  background: linear-gradient(135deg, rgba(91,49,36,0.18), rgba(16,38,43,0.22));
+  border: 2px solid rgba(247,200,115,0.12); cursor: pointer; text-align: center;
+  transition: all 0.3s; font-weight: bold; color: rgba(255,255,255,0.7);
 }
+.count-item.active {
+  border-color: #f7c873; background: rgba(247,200,115,0.18); color: #fff;
+  box-shadow: 0 0 12px rgba(247,200,115,0.2);
+}
+.count-hint { font-size: 0.78rem; color: var(--text-muted); margin-top: 12px; text-align: center; }
 
-.face-item img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.save-face-action {
-  text-align: center;
-  margin-top: 12px;
-  margin-bottom: 12px;
-}
-.loading-placeholder {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px dashed rgba(255, 255, 255, 0.1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  animation: pulse 2s infinite;
-}
-
-.loading-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  color: var(--text-muted);
-}
-
-.loading-content i {
-  font-size: 2rem;
-}
-
-@keyframes pulse {
-  0% { opacity: 0.5; }
-  50% { opacity: 1; }
-  100% { opacity: 0.5; }
-}
+/* 积分 */
 .total-cost-box {
-  margin-top: 16px;
-  text-align: center;
-  padding: 12px;
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 12px;
-  font-size: 0.9rem;
-  color: var(--text-muted);
+  text-align: center; padding: 14px; font-size: 0.9rem; color: var(--text-muted); margin-bottom: 16px;
+  background: linear-gradient(135deg, rgba(91,49,36,0.15), rgba(16,38,43,0.2));
+  border: 1px solid rgba(247,200,115,0.12);
 }
+.cost-value { color: #f7c873; font-size: 1.2rem; font-weight: bold; margin: 0 4px; }
+.cost-unit { font-size: 0.75rem; margin-left: 4px; }
 
-.cost-value {
-  color: var(--primary-color);
-  font-size: 1.2rem;
-  font-weight: bold;
-  margin: 0 4px;
+/* 提交 */
+.action-bar { margin-bottom: 20px; }
+.primary-button.large { width: 100%; height: 50px; font-size: 1.05rem; border-radius: 12px; }
+
+/* 结果 */
+.result-section {
+  padding: 20px; margin-bottom: 20px; animation: fadeIn 0.5s ease;
+  background:
+    linear-gradient(135deg, rgba(91,49,36,0.2), rgba(29,46,45,0.3)),
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.02) 0 1px, transparent 1px 20px);
+  border: 1px solid rgba(247,200,115,0.18);
 }
-
-.cost-unit {
-  font-size: 0.75rem;
-  margin-left: 4px;
+.error-container { margin-bottom: 16px; }
+.leave-hint { margin-bottom: 12px; }
+.result-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.result-item { border-radius: 12px; overflow: hidden; height: 240px; position: relative; }
+.result-download-btn {
+  position: absolute; bottom: 8px; right: 8px; width: 32px; height: 32px;
+  background: rgba(0,0,0,0.6); border-radius: 50%; display: flex; align-items: center;
+  justify-content: center; color: #fff; cursor: pointer; backdrop-filter: blur(4px);
+  transition: all 0.2s; z-index: 2;
 }
-
-.custom-ref-area {
-  margin-top: 16px;
+.result-download-btn:hover { background: var(--primary-color); transform: scale(1.1); }
+.result-actions { display: flex; gap: 12px; }
+.result-actions .el-button { flex: 1; }
+.loading-placeholder {
+  background: rgba(255,255,255,0.03); border: 1px dashed rgba(255,255,255,0.1);
+  display: flex; align-items: center; justify-content: center; animation: pulse 2s infinite;
 }
+.loading-content { display: flex; flex-direction: column; align-items: center; gap: 10px; color: var(--text-muted); }
+.loading-content i { font-size: 2rem; }
+.mobile-hint { margin-top: 12px; font-size: 0.8rem; color: var(--primary-color); text-align: center; }
 
-.mode-tabs {
-  display: flex;
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 12px;
-  padding: 4px;
-  margin-bottom: 24px;
-}
-
-.mode-tab {
-  flex: 1;
-  text-align: center;
-  padding: 12px;
-  border-radius: 8px;
-  cursor: pointer;
-  color: var(--text-muted);
-  font-weight: 500;
-  transition: all 0.3s;
-}
-
-.mode-tab.active {
-  background: var(--primary-color);
-  color: #fff;
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
-}
-
-.divider {
-  display: flex;
-  align-items: center;
-  text-align: center;
-  color: var(--text-muted);
-  font-size: 0.9rem;
-  margin-bottom: 16px;
-}
-
-.divider::before,
-.divider::after {
-  content: '';
-  flex: 1;
-  border-bottom: 1px dashed rgba(255, 255, 255, 0.2);
-}
-
-.divider span {
-  padding: 0 16px;
-}
-
-.ref-list {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-top: 12px;
-}
-
-.ref-item {
-  width: 80px;
-  height: 120px;
-  position: relative;
-  border-radius: 8px;
-  overflow: hidden;
-  border: 2px solid var(--primary-color);
-}
-
-.ref-img {
-  width: 100%;
-  height: 100%;
-}
-
+/* 参考图 */
+.ref-list { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+.ref-item { width: 80px; height: 120px; position: relative; border-radius: 8px; overflow: hidden; border: 2px solid rgba(247,200,115,0.4); }
+.ref-img { width: 100%; height: 100%; }
 .del-btn {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 20px;
-  height: 20px;
-  background: rgba(0,0,0,0.6);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  cursor: pointer;
+  position: absolute; top: 4px; right: 4px; width: 20px; height: 20px;
+  background: rgba(0,0,0,0.6); border-radius: 50%; display: flex; align-items: center;
+  justify-content: center; color: #fff; cursor: pointer;
 }
-
-.del-btn:hover {
-  background: var(--danger-color, #f56c6c);
-}
-
-.ref-upload-box {
-  width: 80px;
-  height: 120px;
-}
-
+.del-btn:hover { background: var(--danger-color, #f56c6c); }
+.ref-upload-box { width: 80px; height: 120px; }
 .ref-upload-btn {
-  width: 80px;
-  height: 120px;
-  border: 2px dashed rgba(255, 255, 255, 0.2);
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.5rem;
-  color: var(--text-muted);
-  cursor: pointer;
-  transition: all 0.3s;
+  width: 80px; height: 120px; border: 2px dashed rgba(255,255,255,0.2); border-radius: 8px;
+  display: flex; align-items: center; justify-content: center; font-size: 1.5rem;
+  color: var(--text-muted); cursor: pointer; transition: all 0.3s;
 }
+.ref-upload-btn:hover { border-color: #f7c873; color: #f7c873; }
 
-.ref-upload-btn:hover {
-  border-color: var(--primary-color);
-  color: var(--primary-color);
+/* 法律 */
+.legal-notice { margin-top: 16px; text-align: center; }
+:deep(.el-checkbox__label) { color: var(--text-muted); font-size: 0.8rem; }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+
+@media (min-width: 768px) {
+  .result-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+  .result-item { height: 300px; }
+  .mode-card-grid { grid-template-columns: repeat(3, 1fr); }
 }
-
-.custom-ref-mode-hint {
-  margin-bottom: 16px;
+@media (max-width: 480px) {
+  .old-style-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .mvp-title { font-size: 1.05rem; }
+  .mode-title { font-size: 1.5rem; }
 }
 </style>
 

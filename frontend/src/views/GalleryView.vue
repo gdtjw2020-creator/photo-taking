@@ -22,12 +22,18 @@ const fetchGallery = async () => {
     const res = await api.get('/api/photoshoot/gallery')
     const photos = []
     res.data.forEach(task => {
+      let moduleName = 'AI 约拍'
+      if (task.module_type === 'classic_style') moduleName = '时代艺术照'
+      else if (task.module_type === 'darkroom_random') moduleName = '暗房盲盒'
+      else if (task.module_type === 'reference_shoot') moduleName = '照着样子拍'
+      
       if (task.output_urls) {
         task.output_urls.forEach((url, idx) => {
           photos.push({
             id: `${task.id}_${idx}`,
             url: url,
-            date: new Date(task.created_at).toLocaleDateString()
+            date: new Date(task.created_at).toLocaleDateString(),
+            moduleName: moduleName
           })
         })
       }
@@ -127,6 +133,7 @@ onMounted(() => {
           <el-icon><Delete /></el-icon>
         </div>
         <div class="photo-info">
+          <span class="module-tag">{{ photo.moduleName }}</span>
           <span class="date">{{ photo.date }}</span>
         </div>
       </div>
@@ -163,10 +170,11 @@ onMounted(() => {
 .header h1 {
   font-size: 1.5rem;
   margin-bottom: 8px;
+  color: #f7c873;
 }
 
 .header p {
-  color: var(--text-muted);
+  color: rgba(255,255,255,0.6);
   font-size: 0.9rem;
 }
 
@@ -200,9 +208,18 @@ onMounted(() => {
   align-items: center;
 }
 
+.module-tag {
+  font-size: 0.7rem;
+  background: rgba(247, 200, 115, 0.15);
+  color: #f7c873;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(247, 200, 115, 0.3);
+}
+
 .date {
   font-size: 0.75rem;
-  color: #fff;
+  color: rgba(255,255,255,0.7);
 }
 
 .photo-download-btn {
@@ -264,9 +281,9 @@ onMounted(() => {
 .mobile-hint {
   margin-top: 12px;
   font-size: 0.8rem;
-  color: var(--primary-color);
+  color: #f7c873;
   text-align: center;
-  background: rgba(99, 102, 241, 0.1);
+  background: rgba(247, 200, 115, 0.1);
   padding: 8px;
   border-radius: 8px;
 }

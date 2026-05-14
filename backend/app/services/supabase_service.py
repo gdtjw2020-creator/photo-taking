@@ -13,7 +13,16 @@ class SupabaseService:
             print(f"Supabase Client Init Error: {e}")
             self.supabase = None
 
-    def create_task(self, task_id: str, user_id: str, template_id: str, input_url: str):
+    def create_task(
+        self,
+        task_id: str,
+        user_id: str,
+        template_id: str,
+        input_url: str,
+        module_type: str = None,
+        style_id: str = None,
+        metadata: dict = None
+    ):
         """创建约拍任务记录"""
         data = {
             "id": task_id,
@@ -23,19 +32,33 @@ class SupabaseService:
             "status": "pending",
             "created_at": datetime.now(timezone.utc).isoformat() # 内存版本用，使用 ISO 格式
         }
+        extended_data = {
+            **data,
+            "module_type": module_type,
+            "style_id": style_id,
+            "metadata": metadata or {}
+        }
         # 存入本地内存缓存（双写保险）
-        _local_task_cache[task_id] = data
+        _local_task_cache[task_id] = extended_data
         
         if not self.supabase:
             return True
 
         try:
-            res = self.supabase.table("photoshoot_tasks").insert(data).execute()
+            res = self.supabase.table("photoshoot_tasks").insert(extended_data).execute()
             print(f"Supabase Create Task Response: {res}")
             return True
         except Exception as e:
-            print(f"Error creating task in Supabase (Exception): {e}")
-            return True # 返回 True 允许任务继续，依赖内存缓存
+            print(f"Error creating task in Supabase with extended fields (Exception): {e}")
+            try:
+                # T04 迁移前，远程表可能还没有 module_type/style_id/metadata 字段。
+                # 回退到旧字段插入，确保现有生成流程不被新字段阻断。
+                res = self.supabase.table("photoshoot_tasks").insert(data).execute()
+                print(f"Supabase Create Task Fallback Response: {res}")
+                return True
+            except Exception as fallback_e:
+                print(f"Error creating task in Supabase fallback (Exception): {fallback_e}")
+                return True # 返回 True 允许任务继续，依赖内存缓存
 
     def update_task_status(self, task_id: str, status: str, output_urls: list = None, error_message: str = None):
         """更新任务状态"""
