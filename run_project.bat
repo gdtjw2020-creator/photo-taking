@@ -24,15 +24,15 @@ if not exist "%ROOT_DIR%venv\Scripts\activate.bat" (
 
 :: 2. Start Backend
 echo [1/2] Starting Backend...
-start "Goddess-Backend" /d "%ROOT_DIR%backend" cmd /c "call ..\venv\Scripts\activate.bat && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+start "Goddess-Backend" /d "%ROOT_DIR%backend" cmd /k "call ..\venv\Scripts\activate.bat && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
 
 :: 3. Start Frontend
 echo [2/2] Starting Frontend...
 if exist "%ROOT_DIR%frontend\node_modules\" (
-    start "Goddess-Frontend" /d "%ROOT_DIR%frontend" cmd /c "npm run dev"
+    start "Goddess-Frontend" /d "%ROOT_DIR%frontend" cmd /k "npm run dev"
 ) else (
     echo [Info] node_modules not found, installing...
-    start "Goddess-Frontend" /d "%ROOT_DIR%frontend" cmd /c "npm install && npm run dev"
+    start "Goddess-Frontend" /d "%ROOT_DIR%frontend" cmd /k "npm install && npm run dev"
 )
 
 echo ------------------------------------------

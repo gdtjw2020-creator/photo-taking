@@ -67,93 +67,103 @@ class AIService:
 
     async def _generate_openai(self, input_url: Optional[str], prompt: str, ref_url: Optional[str] = None, size: str = "auto", quality: str = "auto") -> List[str]:
         """
-        使用 OpenAI 官方最新最佳实践 (针对 gpt-image-2 模型)
-        支持多图参考融合与 auto 尺寸/质量
+        使用 OpenAI 官方 SDK 调用 gpt-image-2 模型
+        - 有图片时使用 images.edit() 接口（换脸/编辑模式）
+        - 无图片时使用 images.generate() 接口（纯文生图模式）
+        
+        注意：官方 /images/edits 接口要求 multipart/form-data 上传图片文件，
+        不支持 JSON 模式内嵌 image_url。必须使用 SDK 或手动构造 multipart 请求。
         """
         job_no = random.randint(100, 999)
-        print(f"🚀 [OpenAI任务#{job_no}] 模式: 官方模型集成 ({AI_MODEL_NAME})...")
+        print(f"🚀 [OpenAI任务#{job_no}] 官方 SDK 模式 ({AI_MODEL_NAME})...")
         
         try:
-            # 1. 准备请求参数 (遵循官方 Demo 最佳实践: DALL-E 3/gpt-image-2 JSON 模式)
-            # 根据 Demo (app/api/photobooth/route.ts)，gpt-image-2 在 JSON 模式下支持 images 数组
-            images_input = []
-            if ref_url:
-                images_input.append({"image_url": ref_url})
-            if input_url:
-                images_input.append({"image_url": input_url})
+            from io import BytesIO
+            
+            # 1. 确定尺寸和质量
+            target_size = "auto" if input_url else (size or "auto")
+            target_quality = quality or "auto"
 
-            # 2. 准备增强提示词 (从 Demo 借鉴的输出要求，有助于保持一致性)
-            output_requirements = "Output requirements: preserve the exact people, poses, facial expressions, and scene composition as faithfully as possible."
-            final_prompt = f"{prompt}\n\n{output_requirements}"
-
-            # 3. 准备参数
-            # 换脸模式强制使用 auto，文生图模式使用环境配置尺寸
-            target_size = "auto" if input_url else (size if size else "auto")
-            target_quality = quality if quality else "auto"
-
-            # 调试日志
+            # 2. 调试日志
             print(f"================ OpenAI DEBUG (Task #{job_no}) ================")
-            print(f"Interface: Image API (JSON Mode) | Endpoint: /images/edits")
-            print(f"Model: {AI_MODEL_NAME}")
-            print(f"Size: {target_size}")
-            print(f"Quality: {target_quality}")
-            print(f"Prompt: {prompt[:100]}...")
-            print(f"Images Input: {json.dumps(images_input)}")
+            print(f"Model: {AI_MODEL_NAME} | Size: {target_size} | Quality: {target_quality}")
+            print(f"Face photo (input_url): {'✅' if input_url else '❌'}")
+            print(f"Scene photo (ref_url): {'✅' if ref_url else '❌'}")
+            print(f"Prompt: {prompt[:150]}...")
             print(f"============================================================")
 
-            # 4. 发起请求
-            # 使用 openai 客户端的内部 post 方法以自动处理 Auth 头部
-            # 或者使用 httpx 手动处理
-            endpoint = "/images/edits"
-            payload = {
-                "model": AI_MODEL_NAME,
-                "prompt": final_prompt,
-                "images": images_input,
-                "size": target_size,
-                "quality": target_quality,
-                "output_format": self.output_format or "png"
-            }
+            has_images = input_url or ref_url
 
-            async with httpx.AsyncClient(timeout=120.0) as client:
-                headers = {
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json"
-                }
-                # 注意：这里我们直接调用官方 API 路径
-                url = f"{self.base_url}/images/edits" if not self.base_url.endswith("/images/edits") else self.base_url
+            if has_images:
+                # ===== 有图片 → 走 images.edit() 接口 =====
+                image_buffers = []
                 
-                response = await client.post(url, headers=headers, json=payload)
-                
-                if response.status_code != 200:
-                    print(f"❌ [OpenAI任务#{job_no}] 请求失败 ({response.status_code}): {response.text}")
+                # 下载图片到内存（先场景底图，后人脸参考图）
+                async with httpx.AsyncClient(timeout=60.0) as dl:
+                    if ref_url:
+                        r = await dl.get(ref_url)
+                        if r.status_code == 200:
+                            buf = BytesIO(r.content)
+                            buf.name = "scene.png"
+                            image_buffers.append(buf)
+                            print(f"  📥 场景底图下载成功 ({len(r.content)} bytes)")
+                        else:
+                            print(f"  ⚠️ 场景底图下载失败: HTTP {r.status_code}")
+                    
+                    if input_url:
+                        r = await dl.get(input_url)
+                        if r.status_code == 200:
+                            buf = BytesIO(r.content)
+                            buf.name = "face.png"
+                            image_buffers.append(buf)
+                            print(f"  📥 人脸参考图下载成功 ({len(r.content)} bytes)")
+                        else:
+                            print(f"  ⚠️ 人脸参考图下载失败: HTTP {r.status_code}")
+
+                if not image_buffers:
+                    print(f"❌ [OpenAI任务#{job_no}] 所有图片下载失败，无法继续")
                     return []
 
-                result_data = response.json()
+                # 调用 SDK：单张传文件对象，多张传列表
+                image_param = image_buffers[0] if len(image_buffers) == 1 else image_buffers
+                
+                response = await self.openai_client.images.edit(
+                    model=AI_MODEL_NAME,
+                    image=image_param,
+                    prompt=prompt,
+                    size=target_size,
+                    n=1,
+                )
+            else:
+                # ===== 无图片 → 走 images.generate() 接口 =====
+                response = await self.openai_client.images.generate(
+                    model=AI_MODEL_NAME,
+                    prompt=prompt,
+                    size=target_size,
+                    quality=target_quality,
+                    n=1,
+                )
 
-            # 5. 解析结果
+            # 3. 解析结果（统一处理 url 和 b64_json 两种返回格式）
             image_urls = []
-            if "data" in result_data:
-                for item in result_data["data"]:
-                    url = item.get("url")
-                    b64 = item.get("b64_json")
-                    if url:
-                        image_urls.append(url)
-                    elif b64:
-                        # 如果是 Base64，自动拼接 Data URI 前缀
-                        prefix = f"data:image/{self.output_format or 'png'};base64,"
-                        image_urls.append(f"{prefix}{b64}")
+            for item in response.data:
+                if item.url:
+                    image_urls.append(item.url)
+                elif item.b64_json:
+                    fmt = self.output_format or "png"
+                    prefix = f"data:image/{fmt};base64,"
+                    image_urls.append(f"{prefix}{item.b64_json}")
 
             if image_urls:
                 print(f"✅ [OpenAI任务#{job_no}] 生成成功: {len(image_urls)} 张图")
                 return image_urls
             
-            print(f"⚠️ [OpenAI任务#{job_no}] 未找到生成结果: {result_data}")
+            print(f"⚠️ [OpenAI任务#{job_no}] 未找到生成结果")
             return []
-
-
 
         except Exception as e:
             print(f"‼️ [OpenAI任务#{job_no}] 异常: {str(e)}")
+            traceback.print_exc()
             return []
 
     async def _generate_openrouter(self, input_url: str, prompt: str) -> List[str]:

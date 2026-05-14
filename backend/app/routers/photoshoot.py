@@ -191,7 +191,15 @@ async def generate_photoshoot(
     selected_prompts = []
     if request.reference_image_urls:
         # 如果有参考图，优化提示词以更好地触发底层多图换脸
-        selected_prompts = ["使用图片1(image_1)的人脸，保持图片2(image_0)的动作、姿势、服装和背景完全不变。融合后的人脸和身体的比例关系要正确。"] * request.image_count
+        selected_prompts = [
+            "The first image is the target scene with a specific pose, clothing, and background. "
+            "The second image is a portrait showing the person whose face should be used. "
+            "Seamlessly replace the face in the first image with the face from the second image. "
+            "Keep the exact pose, body proportions, clothing, hairstyle, background, and lighting "
+            "from the first image completely unchanged. The face replacement must look natural with "
+            "correct skin tone blending, consistent lighting direction, and proper proportional scaling. "
+            "The result should be photorealistic, cinematic quality, 4K."
+        ] * request.image_count
     else:
         # 否则走旧的模板逻辑
         templates = supabase_service.get_all_templates()
