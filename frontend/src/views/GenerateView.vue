@@ -309,6 +309,8 @@ const submitTask = async () => {
 const pollTimer = ref(null)
 const taskStatus = ref('')
 const errorMessage = ref('')
+const debugMessage = ref('')
+const showDebug = ref(false)
 const resultImages = ref([])
 const taskStartTime = ref(null)     // 任务提交时间 (ms)
 const elapsedSeconds = ref(0)       // 已等待秒数
@@ -375,7 +377,15 @@ const startPolling = (tid, existingStartTime = null) => {
         ElMessage.success('全组照片冲洗完成！')
         stopPolling()
       } else if (data.status === 'failed') {
-        errorMessage.value = data.error_message || '任务生成失败，请重试'
+        const fullMsg = data.error_message || '影艺创作遇到一点小麻烦'
+        if (fullMsg.includes(' | [DEBUG] ')) {
+          const parts = fullMsg.split(' | [DEBUG] ')
+          errorMessage.value = parts[0]
+          debugMessage.value = parts[1]
+        } else {
+          errorMessage.value = fullMsg
+          debugMessage.value = ''
+        }
         ElMessage.error(errorMessage.value)
         stopPolling()
       }
@@ -603,7 +613,19 @@ const downloadAll = async () => {
       <!-- ===== 结果展示 ===== -->
       <div v-if="taskStatus" class="result-section glass-card">
         <div v-if="taskStatus === 'failed'" class="error-container">
-          <el-alert :title="errorMessage" type="error" description="检查图片是否清晰，或稍后重试。" show-icon :closable="false" />
+          <el-alert :title="errorMessage" type="error" show-icon :closable="false">
+            <template #default>
+              <div class="error-details-wrapper">
+                <p>建议：检查图片是否清晰，或稍后重试。</p>
+                <div v-if="debugMessage" class="debug-toggle" @click="showDebug = !showDebug">
+                  {{ showDebug ? '隐藏技术细节 ↑' : '查看错误详情 ↓' }}
+                </div>
+                <div v-if="showDebug" class="debug-content">
+                  <code>{{ debugMessage }}</code>
+                </div>
+              </div>
+            </template>
+          </el-alert>
         </div>
         <div v-if="taskStatus === 'processing'" class="leave-hint">
           <el-alert title="后台冲洗中，可放心离开" type="info" :closable="false" show-icon>
@@ -648,6 +670,37 @@ const downloadAll = async () => {
   max-width: 1000px;
   margin: 0 auto;
   box-sizing: border-box;
+}
+
+.error-details-wrapper {
+  margin-top: 8px;
+}
+
+.debug-toggle {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 0.75rem;
+  color: #9bd7cb;
+  cursor: pointer;
+  text-decoration: underline;
+  opacity: 0.8;
+}
+
+.debug-toggle:hover {
+  opacity: 1;
+}
+
+.debug-content {
+  margin-top: 10px;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 6px;
+  font-family: monospace;
+  font-size: 0.7rem;
+  color: #fca5a5;
+  word-break: break-all;
+  max-height: 150px;
+  overflow-y: auto;
 }
 
 /* 模式选择页 */

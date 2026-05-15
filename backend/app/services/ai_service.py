@@ -189,8 +189,32 @@ class AIService:
             return []
 
         except Exception as e:
-            print(f"‼️ [OpenAI任务#{job_no}] 异常: {str(e)}")
+            # 1. 提取技术细节 (取前 100 个字符)
+            raw_err = str(e)
+            debug_info = raw_err[:150] + ("..." if len(raw_err) > 150 else "")
+            
+            # 2. 映射友好提示
+            user_msg = "影艺创作遇到一点小麻烦"
+            if "safety_violations" in raw_err:
+                user_msg = "触发内容安全审查，请更换照片或风格"
+            elif "timeout" in raw_err.lower():
+                user_msg = "AI 响应过慢，请稍后在相册查看"
+            elif "401" in raw_err or "api_key" in raw_err.lower():
+                user_msg = "后台服务配置更新中"
+            
+            # 3. 组合存储: "友好提示 | [DEBUG] 原始报错"
+            combined_error = f"{user_msg} | [DEBUG] {debug_info}"
+            
+            job_no = task_id[-4:] if task_id else "unknown"
+            print(f"‼️ [OpenAI任务#{job_no}] 异常详情: {raw_err}")
             traceback.print_exc()
+            
+            if task_id and hasattr(self, 'supabase'):
+                self.supabase.update_task_status(
+                    task_id, 
+                    "failed", 
+                    error_message=combined_error
+                )
             return []
 
     async def _generate_openrouter(self, input_url: str, prompt: str) -> List[str]:
