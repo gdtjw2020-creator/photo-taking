@@ -41,6 +41,7 @@ class PhotoshootRequest(BaseModel):
     quality: str = AI_IMAGE_QUALITY      # 读取 .env 中的质量配置 (auto, high, medium, low)
     size: str = AI_IMAGE_SIZE            # 读取 .env 中的尺寸配置
     watermark: bool = True               # 是否添加"AI生成"水印，默认开启
+    framing: Optional[str] = None        # 构图选择 (portrait, half_body, upper_body, etc.)
 
 class PhotoshootResponse(BaseModel):
     task_id: str
@@ -62,6 +63,16 @@ LEGACY_FACE_SWAP_PROMPT = (
     "correct skin tone blending, consistent lighting direction, and proper proportional scaling. "
     "The result should be photorealistic, cinematic quality, 4K."
 )
+
+# 景别枚举到提示词关键词的映射
+FRAMING_KEYWORDS = {
+    "portrait": "Close-up portrait, high face detail",
+    "upper_body": "Upper body shot",
+    "half_body": "Half-body shot",
+    "three_quarter": "Three-quarter view portrait",
+    "full_body": "Full body shot, head to toe",
+    "wide": "Wide shot, environmental portrait"
+}
 
 
 def _safe_image_count(value: Optional[int], default: int = 1, max_count: int = 5) -> int:
@@ -118,9 +129,17 @@ def _select_mvp_prompts(request: PhotoshootRequest) -> Optional[Dict[str, Any]]:
         if not style:
             raise HTTPException(status_code=400, detail=f"未知年代风格: {request.style_id}")
 
+        # 确定最终景别：用户手动选择优先，否则使用风格默认值
+        final_framing = request.framing or style.get("default_framing")
+        framing_prefix = f"{FRAMING_KEYWORDS[final_framing]}, " if final_framing in FRAMING_KEYWORDS else ""
+
         prompts = style.get("prompts") or []
         count = min(_safe_image_count(request.image_count, style.get("recommended_count", 1)), len(prompts))
-        selected_prompts = random.sample(prompts, count)
+        selected_raw_prompts = random.sample(prompts, count)
+        
+        # 将景别前缀拼接到原始提示词中
+        selected_prompts = [f"{framing_prefix}{p}" for p in selected_raw_prompts]
+
         return {
             "image_count": count,
             "selected_prompts": selected_prompts,
@@ -129,6 +148,7 @@ def _select_mvp_prompts(request: PhotoshootRequest) -> Optional[Dict[str, Any]]:
                 "module_name": "时代艺术照",
                 "style_ids": [style["id"]],
                 "style_names": [style["name"]],
+                "framing": final_framing
             },
         }
 
@@ -137,7 +157,15 @@ def _select_mvp_prompts(request: PhotoshootRequest) -> Optional[Dict[str, Any]]:
         requested_count = request.image_count if request.image_count in (3, 6, 9) else 3
         count = min(requested_count, len(styles))
         selected_styles = random.sample(styles, count)
-        selected_prompts = [random.choice(style["prompts"]) for style in selected_styles]
+        
+        # 盲盒模式：每张图使用各自风格的默认景别
+        selected_prompts = []
+        for style in selected_styles:
+            raw_p = random.choice(style["prompts"])
+            final_framing = style.get("default_framing")
+            prefix = f"{FRAMING_KEYWORDS[final_framing]}, " if final_framing in FRAMING_KEYWORDS else ""
+            selected_prompts.append(f"{prefix}{raw_p}")
+
         return {
             "image_count": count,
             "selected_prompts": selected_prompts,
@@ -159,7 +187,10 @@ def _select_mvp_prompts(request: PhotoshootRequest) -> Optional[Dict[str, Any]]:
 
         refs = request.reference_image_urls[:5]
         mode = request.prompt_mode if request.prompt_mode in REFERENCE_PROMPT_MODES else "similar"
+        
+        # 照着样子拍模式，不再受 framing 提示词干扰，完全尊重参考图构图
         prompt = _build_reference_prompt(mode)
+        
         return {
             "image_count": len(refs),
             "selected_prompts": [prompt] * len(refs),
@@ -412,6 +443,7 @@ async def get_old_photo_styles():
             "preview_url": overrides.get(style["id"], {}).get("preview_url") or style["preview_url"],
             "tags": style["tags"],
             "recommended_count": style["recommended_count"],
+            "default_framing": style.get("default_framing"),
         }
         for style in hardcoded_styles
     ]

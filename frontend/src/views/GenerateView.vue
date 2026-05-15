@@ -1,7 +1,7 @@
 <script setup>
 import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { ElMessage, ElLoading, ElMessageBox } from 'element-plus'
-import { Loading, ZoomIn, Close, Plus, Download, Camera, Picture, Edit } from '@element-plus/icons-vue'
+import { Loading, ZoomIn, Close, Plus, Download, Camera, Picture, Edit, Check } from '@element-plus/icons-vue'
 import api from '../api'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../store/auth'
@@ -23,6 +23,16 @@ const promptMode = ref('similar')
 const isAdmin = ref(false)
 const previewStyle = ref(null)
 const showPreview = ref(false)
+
+// 构图选项定义
+const framingOptions = [
+  { label: '特写', value: 'portrait', icon: '👤', desc: '头部到肩膀' },
+  { label: '上身', value: 'upper_body', icon: '👕', desc: '胸部以上' },
+  { label: '半身', value: 'half_body', icon: '👖', desc: '膝盖以上' },
+  { label: '七分', value: 'three_quarter', icon: '👢', desc: '小腿以上' },
+  { label: '全身', value: 'full_body', icon: '🧍', desc: '从头到脚' }
+]
+const selectedFraming = ref(null)
 
 const pageTitle = computed(() => {
   const m = { classic_style: '时代艺术照', darkroom_random: '暗房盲盒', reference_shoot: '照着样子拍' }
@@ -138,6 +148,9 @@ const addWatermark = ref(true)
 
 const selectOldStyle = (style) => {
   selectedStyle.value = style
+  // 切换风格时，自动同步该风格推荐的默认景别
+  selectedFraming.value = style.default_framing || 'half_body'
+  
   if (selectedCount.value > (style.recommended_count || 2)) {
     selectedCount.value = style.recommended_count || 2
   }
@@ -318,7 +331,14 @@ const submitTask = async () => {
     }
 
     const payloads = {
-      classic_style: { module_type: 'classic_style', style_id: selectedStyle.value?.id, image_url: uploadedImageUrl.value, image_count: selectedCount.value, watermark: addWatermark.value },
+      classic_style: { 
+        module_type: 'classic_style', 
+        style_id: selectedStyle.value?.id, 
+        image_url: uploadedImageUrl.value, 
+        image_count: selectedCount.value, 
+        watermark: addWatermark.value,
+        framing: selectedFraming.value // 传递景别参数
+      },
       darkroom_random: { module_type: 'darkroom_random', image_url: uploadedImageUrl.value, image_count: darkroomPackage.value, watermark: addWatermark.value },
       reference_shoot: { module_type: 'reference_shoot', prompt_mode: promptMode.value, image_url: uploadedImageUrl.value, reference_image_urls: referenceImages.value, image_count: referenceImages.value.length || 1, watermark: addWatermark.value }
     }
@@ -582,6 +602,30 @@ const triggerPreview = (style) => {
         </div>
         <!-- 隐藏的管理员文件输入 -->
         <input type="file" ref="styleCoverInput" style="display: none" accept="image/*" @change="handleAdminCoverUpload">
+        
+        <!-- 景别选择 (仅在选好风格后显示) -->
+        <div v-if="selectedStyle" class="framing-section animate__animated animate__fadeIn">
+          <div class="section-divider"></div>
+          <h3>2. 选择拍摄景别</h3>
+          <p class="section-subtitle">唐师傅已为您推荐最适配当前风格的构图，您也可以手动调整</p>
+          <div class="framing-grid">
+            <div v-for="opt in framingOptions" :key="opt.value" 
+              class="framing-item" 
+              :class="{ active: selectedFraming === opt.value, 'is-recommended': selectedStyle.default_framing === opt.value }"
+              @click="selectedFraming = opt.value"
+            >
+              <div class="framing-icon-box">{{ opt.icon }}</div>
+              <div class="framing-meta">
+                <span class="framing-label">{{ opt.label }}</span>
+                <span class="framing-desc">{{ opt.desc }}</span>
+              </div>
+              <div v-if="selectedStyle.default_framing === opt.value" class="recommend-badge">推荐</div>
+              <div class="active-check" v-if="selectedFraming === opt.value">
+                <el-icon><Check /></el-icon>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- ===== 暗房盲盒 Step 1 ===== -->
@@ -1111,6 +1155,110 @@ h2 { color: #f7c873; font-size: 1.1rem; margin-bottom: 16px; font-weight: 700; }
 @media (max-width: 480px) {
   .old-style-desc { white-space: normal; height: auto; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
   .old-style-item { height: auto; }
+}
+
+.framing-section {
+  margin-top: 32px;
+  text-align: left;
+}
+
+.section-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(212, 175, 55, 0.3), transparent);
+  margin-bottom: 24px;
+}
+
+.section-subtitle {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: -8px;
+  margin-bottom: 20px;
+}
+
+.framing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.framing-item {
+  position: relative;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1.5px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+.framing-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(212, 175, 55, 0.4);
+  transform: translateY(-2px);
+}
+
+.framing-item.active {
+  background: rgba(212, 175, 55, 0.15);
+  border-color: #d4af37;
+  box-shadow: 0 0 15px rgba(212, 175, 55, 0.2);
+}
+
+.framing-icon-box {
+  font-size: 1.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+}
+
+.framing-meta {
+  display: flex;
+  flex-direction: column;
+}
+
+.framing-label {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #fff;
+}
+
+.framing-desc {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.recommend-badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  background: #d4af37;
+  color: #000;
+  font-size: 10px;
+  padding: 2px 8px;
+  border-bottom-left-radius: 8px;
+  font-weight: bold;
+  transform: scale(0.9);
+}
+
+.active-check {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  color: #d4af37;
+  font-size: 1.2rem;
+}
+
+@media (max-width: 768px) {
+  .framing-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 </style>
 

@@ -33,6 +33,7 @@ OLD_PHOTO_STYLES: List[Dict[str, object]] = [
         "preview_url": "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?q=80&w=400&h=500&auto=format&fit=crop&sepia=100",
         "tags": ["black_and_white", "studio", "portrait", "1950s"],
         "recommended_count": 2,
+        "default_framing": "portrait",
         "prompts": [
             _prompt(
                 "1950s Chinese worker-soldier studio portrait, black and white, "
@@ -57,6 +58,7 @@ OLD_PHOTO_STYLES: List[Dict[str, object]] = [
         "preview_url": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=400&h=500&auto=format&fit=crop",
         "tags": ["hong_kong", "cinematic", "warm_light", "1980s"],
         "recommended_count": 3,
+        "default_framing": "half_body",
         "prompts": [
             _prompt(
                 "1980s Hong Kong movie star portrait, warm tungsten studio light, "
@@ -81,6 +83,7 @@ OLD_PHOTO_STYLES: List[Dict[str, object]] = [
         "preview_url": "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?q=80&w=400&h=500&auto=format&fit=crop",
         "tags": ["shanghai", "qipao", "soft_light", "republic_era"],
         "recommended_count": 3,
+        "default_framing": "half_body",
         "prompts": [
             _prompt(
                 "1930s old Shanghai elegant qipao portrait, refined silk qipao, "
@@ -105,6 +108,7 @@ OLD_PHOTO_STYLES: List[Dict[str, object]] = [
         "preview_url": "https://images.unsplash.com/photo-1517841905240-472988babdf9?q=80&w=400&h=500&auto=format&fit=crop",
         "tags": ["student", "republic_era", "clean", "youth"],
         "recommended_count": 2,
+        "default_framing": "half_body",
         "prompts": [
             _prompt(
                 "Republican-era Chinese student portrait, simple blue student "
@@ -128,6 +132,7 @@ OLD_PHOTO_STYLES: List[Dict[str, object]] = [
         "preview_url": "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?q=80&w=400&h=500&auto=format&fit=crop",
         "tags": ["disco", "color", "1980s", "dynamic"],
         "recommended_count": 3,
+        "default_framing": "upper_body",
         "prompts": [
             _prompt(
                 "1980s Chinese disco studio portrait, colorful neon party lights, "
@@ -151,6 +156,7 @@ OLD_PHOTO_STYLES: List[Dict[str, object]] = [
         "preview_url": "https://images.unsplash.com/photo-1509062522246-3755977927d7?q=80&w=400&h=500&auto=format&fit=crop",
         "tags": ["stage", "red", "uniform", "1970s"],
         "recommended_count": 2,
+        "default_framing": "upper_body",
         "prompts": [
             _prompt(
                 "1970s Chinese revolutionary model opera publicity portrait, "
@@ -175,6 +181,7 @@ OLD_PHOTO_STYLES: List[Dict[str, object]] = [
         "preview_url": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400&h=500&auto=format&fit=crop",
         "tags": ["studio", "soft_focus", "1990s", "portrait"],
         "recommended_count": 3,
+        "default_framing": "half_body",
         "prompts": [
             _prompt(
                 "1990s Chinese photo studio glamour portrait, soft focus lens, "
@@ -199,6 +206,7 @@ OLD_PHOTO_STYLES: List[Dict[str, object]] = [
         "preview_url": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=400&h=500&auto=format&fit=crop",
         "tags": ["beijing", "studio", "formal", "vintage"],
         "recommended_count": 2,
+        "default_framing": "portrait",
         "prompts": [
             _prompt(
                 "old Beijing traditional photo studio portrait, formal seated "
@@ -222,6 +230,7 @@ OLD_PHOTO_STYLES: List[Dict[str, object]] = [
         "preview_url": "https://images.unsplash.com/photo-1488161628813-04466f872be2?q=80&w=400&h=500&auto=format&fit=crop",
         "tags": ["countryside", "youth", "1960s", "documentary"],
         "recommended_count": 2,
+        "default_framing": "full_body",
         "prompts": [
             _prompt(
                 "1960s-1970s Chinese educated youth countryside portrait, plain "

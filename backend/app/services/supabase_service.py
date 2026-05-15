@@ -281,17 +281,25 @@ class SupabaseService:
     def get_user_profile(self, user_id: str):
         """获取用户个人资料"""
         if not self.supabase:
+            print(f"[DEBUG] Supabase not initialized, returning local default for user: {user_id}")
             return {"id": user_id, "username": "本地用户", "credits": INITIAL_CREDITS}
         try:
+            print(f"[DEBUG] Fetching profile for user_id: {user_id}")
             res = self.supabase.table("profiles").select("*").eq("id", user_id).execute()
             if res.data:
-                return res.data[0]
+                profile = res.data[0]
+                print(f"[DEBUG] Profile found: {profile.get('username')}, Credits: {profile.get('credits')}")
+                return profile
+            
             # 如果不存在则自动创建一个初始配置，默认送积分
+            print(f"[DEBUG] Profile not found for {user_id}, creating new one...")
             new_profile = {"id": user_id, "username": "新用户", "credits": INITIAL_CREDITS}
             self.supabase.table("profiles").insert(new_profile).execute()
             return new_profile
         except Exception as e:
-            print(f"Error fetching profile: {e}")
+            print(f"[ERROR] Exception in get_user_profile for {user_id}: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return {"id": user_id, "username": "系统用户", "credits": 0}
 
     def redeem_code(self, user_id: str, code: str):

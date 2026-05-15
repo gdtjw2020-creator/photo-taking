@@ -25,16 +25,21 @@ class AIService:
         self.poll_max_attempts = AI_POLL_MAX_ATTEMPTS
         self.proxy = AI_PROXY
         
+        # 确保 base_url 格式统一（去掉末尾可能存在的 /v1，由逻辑统一添加）
+        if self.base_url.endswith("/v1"):
+            self.base_url = self.base_url[:-3]
+        if self.base_url.endswith("/"):
+            self.base_url = self.base_url[:-1]
+
         # Initialize OpenAI Client (Unified) with Proxy Support
         client_args = {
             "api_key": self.api_key,
-            "base_url": self.base_url
+            "base_url": f"{self.base_url}/v1" # SDK 内部统一使用带 /v1 的
         }
         
         if self.proxy:
             print(f"🌐 [AI] Using proxy: {self.proxy}")
             # OpenAI SDK accepts a custom http_client
-            # Note: For socks5, user must install 'httpx[socks]'
             client_args["http_client"] = httpx.AsyncClient(
                 proxy=self.proxy,
                 timeout=300.0,
