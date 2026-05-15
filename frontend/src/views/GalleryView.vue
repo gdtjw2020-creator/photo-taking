@@ -119,13 +119,20 @@ onMounted(() => {
       <div v-for="(photo, index) in myPhotos" :key="photo.id" class="photo-item glass-card">
         <el-image
             :src="photo.url"
-            :preview-src-list="isMobile ? [] : myPhotos.map(p => p.url)"
+            :preview-src-list="isMobile ? [photo.url] : myPhotos.map(p => p.url)"
             :initial-index="index"
             :key="photo.url"
             fit="cover"
             class="gallery-img"
             preview-teleported
-        ></el-image>
+            lazy
+        >
+          <template #placeholder>
+            <div class="image-slot">
+              加载中<span class="dot">...</span>
+            </div>
+          </template>
+        </el-image>
         <div class="photo-download-btn" @click.stop="downloadImage(photo.url)">
           <el-icon><Download /></el-icon>
         </div>
@@ -194,6 +201,27 @@ onMounted(() => {
 .gallery-img {
   width: 100%;
   height: 100%;
+}
+
+.image-slot {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.dot {
+  animation: dot 1.5s infinite;
+}
+
+@keyframes dot {
+  0% { opacity: 0; }
+  50% { opacity: 1; }
+  100% { opacity: 0; }
 }
 
 .photo-info {
