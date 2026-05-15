@@ -28,7 +28,7 @@ onMounted(async () => {
     const profileRes = await api.get('/api/user/profile')
     user.value = {
       username: profileRes.data.username || authStore.user?.email?.split('@')[0] || '雅致宾客',
-      email: authStore.user?.email || '',
+      email: profileRes.data.email || authStore.user?.email || '未绑定邮箱',
       credits: profileRes.data.credits,
       avatar: profileRes.data.avatar_url || user.value.avatar
     }

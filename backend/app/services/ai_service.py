@@ -36,7 +36,7 @@ class AIService:
             # OpenAI SDK accepts a custom http_client
             # Note: For socks5, user must install 'httpx[socks]'
             client_args["http_client"] = httpx.AsyncClient(
-                proxies=self.proxy,
+                proxy=self.proxy,
                 timeout=60.0,
                 follow_redirects=True
             )
@@ -46,7 +46,7 @@ class AIService:
     def _get_proxy_client(self, timeout=60.0):
         """专门用于 AI 相关请求（OpenAI, OpenRouter, 第三方生图站）的客户端，走代理"""
         if self.proxy:
-            return httpx.AsyncClient(proxies=self.proxy, timeout=timeout, follow_redirects=True)
+            return httpx.AsyncClient(proxy=self.proxy, timeout=timeout, follow_redirects=True)
         return httpx.AsyncClient(timeout=timeout)
 
     def _get_direct_client(self, timeout=30.0):
