@@ -598,7 +598,7 @@ const downloadAll = async () => {
 .mode-card {
   width: 100%; padding: 20px; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px;
   color: #fff; text-align: left; cursor: pointer; display: grid; gap: 6px;
-  background: linear-gradient(135deg, rgba(91,49,36,0.45), rgba(16,38,43,0.5));
+  background: linear-gradient(135deg, rgba(139, 107, 67, 0.3), rgba(26, 22, 20, 0.5));
   transition: all 0.2s;
 }
 .mode-card:hover { transform: translateY(-2px); border-color: rgba(247,200,115,0.48); }
@@ -611,8 +611,8 @@ const downloadAll = async () => {
 /* MVP 页头 */
 .mvp-page-header {
   text-align: center; padding: 20px; margin-bottom: 20px;
-  background: linear-gradient(135deg, rgba(91,49,36,0.28), rgba(16,38,43,0.42));
-  border: 1px solid rgba(247,200,115,0.22); position: relative;
+  background: linear-gradient(135deg, rgba(139, 107, 67, 0.15), rgba(26, 22, 20, 0.3));
+  border: 1px solid rgba(212, 167, 106, 0.22); position: relative;
 }
 .mvp-header-back {
   position: absolute; left: 16px; top: 14px; color: #9bd7cb; font-size: 0.82rem;
@@ -626,9 +626,9 @@ const downloadAll = async () => {
 .step-card {
   padding: 20px; margin-bottom: 20px; animation: fadeIn 0.4s ease;
   background:
-    linear-gradient(135deg, rgba(91,49,36,0.22), rgba(29,46,45,0.32)),
-    repeating-linear-gradient(90deg, rgba(255,255,255,0.02) 0 1px, transparent 1px 20px);
-  border: 1px solid rgba(247,200,115,0.18);
+    linear-gradient(135deg, rgba(139, 107, 67, 0.1), rgba(26, 22, 20, 0.2)),
+    repeating-linear-gradient(90deg, rgba(212, 167, 106, 0.03) 0 1px, transparent 1px 20px);
+  border: 1px solid rgba(212, 167, 106, 0.18);
 }
 h2 { color: #f7c873; font-size: 1.1rem; margin-bottom: 16px; font-weight: 700; }
 
@@ -726,9 +726,9 @@ h2 { color: #f7c873; font-size: 1.1rem; margin-bottom: 16px; font-weight: 700; }
 .result-section {
   padding: 20px; margin-bottom: 20px; animation: fadeIn 0.5s ease;
   background:
-    linear-gradient(135deg, rgba(91,49,36,0.2), rgba(29,46,45,0.3)),
-    repeating-linear-gradient(90deg, rgba(255,255,255,0.02) 0 1px, transparent 1px 20px);
-  border: 1px solid rgba(247,200,115,0.18);
+    linear-gradient(135deg, rgba(139, 107, 67, 0.15), rgba(26, 22, 20, 0.25)),
+    repeating-linear-gradient(90deg, rgba(212, 167, 106, 0.03) 0 1px, transparent 1px 20px);
+  border: 1px solid rgba(212, 167, 106, 0.18);
 }
 .error-container { margin-bottom: 16px; }
 .leave-hint { margin-bottom: 12px; }

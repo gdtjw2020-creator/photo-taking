@@ -42,25 +42,25 @@ html, body {
   width: 100%;
   overflow-x: hidden;
   background-color: var(--bg-dark);
-  color: #f8fafc;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  font-size: 16px; /* 强制基础字号 */
+  /* 增加复古暗角效果 */
+  background-image: radial-gradient(circle at center, transparent 0%, rgba(0,0,0,0.4) 100%);
+  color: var(--text-main);
+  font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  font-size: 16px;
   -webkit-font-smoothing: antialiased;
-  -webkit-text-size-adjust: 100%;
-  -moz-text-size-adjust: 100%;
-  -ms-text-size-adjust: 100%;
-  text-size-adjust: 100%;
 }
 
 .app-container {
-  width: 100vw; /* 显式使用视口宽度 */
+  width: 100vw;
   max-width: 1000px;
   margin: 0 auto;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
   position: relative;
-  background-color: var(--bg-dark);
+  /* 增加微妙的胶片颗粒感 */
+  background: linear-gradient(rgba(18, 16, 14, 0.95), rgba(18, 16, 14, 0.95)),
+              url('data:image/svg+xml,%3Csvg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"%3E%3Cfilter id="noiseFilter"%3E%3CfeTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch"/%3E%3C/filter%3E%3Crect width="100%25" height="100%25" filter="url(%23noiseFilter)"/%3E%3C/svg%3E');
   box-sizing: border-box;
 }
 
@@ -73,22 +73,21 @@ html, body {
 
 .tab-bar {
   position: fixed;
-  bottom: 0; /* 贴合底部 */
+  bottom: 0;
   left: 50%;
   transform: translateX(-50%);
   width: 100%;
-  max-width: 1000px; /* 与容器一致 */
-  height: calc(65px + env(safe-area-inset-bottom)); /* 适配 iOS 刘海屏底部安全区 */
+  max-width: 1000px;
+  height: calc(65px + env(safe-area-inset-bottom));
   padding-bottom: env(safe-area-inset-bottom);
   display: flex;
   justify-content: space-around;
   align-items: center;
   z-index: 1000;
-  background: rgba(30, 41, 59, 0.8);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px); /* 兼容 Chrome/Safari 移动端 */
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
+  /* 复古暗红/深棕皮革感背景 */
+  background: linear-gradient(180deg, #2d2420 0%, #1a1614 100%);
+  border-top: 1px solid rgba(212, 167, 106, 0.4); /* 古铜金边框 */
+  box-shadow: 0 -4px 30px rgba(0, 0, 0, 0.9);
 }
 
 .tab-item {
@@ -100,20 +99,24 @@ html, body {
   justify-content: center;
   flex: 1;
   height: 100%;
-  transition: all 0.2s;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .tab-item:active {
-  transform: scale(0.9);
+  transform: scale(0.95);
+  background: rgba(212, 167, 106, 0.05);
 }
 
 .router-link-active {
   color: var(--primary-color);
+  /* 激活时增加光晕 */
+  text-shadow: 0 0 10px rgba(212, 167, 106, 0.4);
 }
 
 .tab-label {
-  font-size: 1.2rem;
-  font-weight: 700;
+  font-size: 1rem; /* 略微减小字号，更显精致 */
+  font-weight: 600;
   margin-top: 4px;
+  letter-spacing: 0.05em;
 }
 </style>

@@ -1,9 +1,10 @@
 :root {
-  --primary-color: #6366f1;
-  --bg-dark: #0f172a;
-  --bg-card: #1e293b;
-  --text-main: #f8fafc;
-  --text-muted: #94a3b8;
+  --primary-color: #d4a76a; /* 典雅古铜金 */
+  --bg-dark: #0d0c0b;      /* 深沉暗室黑 */
+  --bg-card: #1a1614;      /* 老木头色 */
+  --text-main: #e5dfcf;    /* 怀旧羊皮纸 */
+  --text-muted: #8d7e6d;   /* 褪色墨水色 */
+  --accent-color: #b33939; /* 暗房安全灯红 */
 }
 
 body {
@@ -11,22 +12,25 @@ body {
 }
 
 .glass-card {
-  background: rgba(30, 41, 59, 0.7);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(28, 24, 22, 0.75);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border: 1px solid rgba(212, 167, 106, 0.2);
   border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
 
 .primary-button {
-  background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
-  border: none;
-  color: white;
+  background: linear-gradient(135deg, #d4a76a 0%, #8b6b43 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #12100e;
   padding: 12px 24px;
   border-radius: 8px;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: 0.05em;
   cursor: pointer;
-  transition: transform 0.2s;
+  transition: all 0.3s;
+  box-shadow: 0 4px 15px rgba(212, 167, 106, 0.2);
 }
 
 .primary-button:active {

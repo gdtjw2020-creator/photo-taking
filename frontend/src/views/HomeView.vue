@@ -95,8 +95,8 @@ const startService = (mode) => {
   margin-top: 5px;
   margin-bottom: 25px;
   padding: 14px;
-  border: 1px solid rgba(251, 191, 36, 0.3);
-  background: rgba(251, 191, 36, 0.05);
+  border: 1px solid rgba(212, 167, 106, 0.3);
+  background: rgba(212, 167, 106, 0.08);
   animation: slideIn 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -113,7 +113,7 @@ const startService = (mode) => {
 
 .announcement-icon {
   flex: 0 0 auto;
-  color: #fbbf24;
+  color: #d4a76a;
   font-size: 0.8rem;
   font-weight: 700;
   line-height: 1.5;
@@ -122,7 +122,7 @@ const startService = (mode) => {
 .announcement p {
   margin: 0;
   font-size: 0.85rem;
-  color: #fbbf24;
+  color: #d4a76a;
   line-height: 1.5;
 }
 
@@ -169,8 +169,8 @@ const startService = (mode) => {
   border: 1px solid rgba(247, 200, 115, 0.22);
   border-radius: 8px;
   background:
-    linear-gradient(135deg, rgba(91, 49, 36, 0.28), rgba(16, 38, 43, 0.42)),
-    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 18px);
+    linear-gradient(135deg, rgba(139, 107, 67, 0.2), rgba(26, 22, 20, 0.4)),
+    repeating-linear-gradient(90deg, rgba(212, 167, 106, 0.04) 0 1px, transparent 1px 18px);
   position: relative;
   overflow: hidden;
   display: flex;
@@ -265,15 +265,15 @@ const startService = (mode) => {
 }
 
 .service-card.classic {
-  background: linear-gradient(135deg, rgba(97, 64, 45, 0.54), rgba(29, 46, 45, 0.56));
+  background: linear-gradient(135deg, rgba(139, 107, 67, 0.4), rgba(45, 36, 32, 0.6));
 }
 
 .service-card.darkroom {
-  background: linear-gradient(135deg, rgba(86, 24, 27, 0.56), rgba(27, 24, 32, 0.64));
+  background: linear-gradient(135deg, rgba(179, 57, 57, 0.3), rgba(26, 22, 20, 0.6));
 }
 
 .service-card.reference {
-  background: linear-gradient(135deg, rgba(37, 74, 75, 0.56), rgba(41, 35, 56, 0.6));
+  background: linear-gradient(135deg, rgba(139, 107, 67, 0.3), rgba(41, 35, 56, 0.4));
 }
 
 .service-meta {
