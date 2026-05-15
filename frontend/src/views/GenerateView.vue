@@ -1,7 +1,7 @@
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElLoading, ElMessageBox } from 'element-plus'
-import { Loading, ZoomIn, Close, Plus, Download } from '@element-plus/icons-vue'
+import { Loading, ZoomIn, Close, Plus, Download, Camera, Picture } from '@element-plus/icons-vue'
 import api from '../api'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../store/auth'
@@ -136,14 +136,26 @@ const checkAuth = (msg = '请先登录后开启您的时光留影之旅') => {
   return true
 }
 
-const handleUpload = async (file) => {
+const cameraInput = ref(null)
+const galleryInput = ref(null)
+
+const triggerCamera = () => {
+  if (cameraInput.value) cameraInput.value.click()
+}
+
+const triggerGallery = () => {
+  if (galleryInput.value) galleryInput.value.click()
+}
+
+const uploadImage = async (rawFile) => {
   if (!checkAuth('上传照片前需要登录，以便为您保存形象存档')) return
   isUploading.value = true
   const formData = new FormData()
-  const resizedFile = await resizeImageIfNeeded(file.raw)
-  formData.append('file', resizedFile)
-
+  
   try {
+    const resizedFile = await resizeImageIfNeeded(rawFile)
+    formData.append('file', resizedFile)
+
     const res = await api.post('/api/photoshoot/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
@@ -159,6 +171,19 @@ const handleUpload = async (file) => {
     ElMessage.error(detail)
   } finally {
     isUploading.value = false
+  }
+}
+
+const handleUpload = async (file) => {
+  await uploadImage(file.raw)
+}
+
+const onFileChange = async (e) => {
+  const file = e.target.files[0]
+  if (file) {
+    await uploadImage(file)
+    // 重置 input，允许重复上传同一张图
+    e.target.value = ''
   }
 }
 
@@ -491,15 +516,48 @@ const downloadAll = async () => {
           </div>
         </div>
         <div class="upload-area">
-          <el-upload class="upload-box" drag action="#" :auto-upload="false" :show-file-list="false" :on-change="handleUpload">
-            <div v-if="!uploadedImageUrl" class="upload-placeholder">
-              <div class="el-upload__text">点击或将照片拖拽到此处</div>
-            </div>
-            <div v-else class="preview-box">
-              <img :src="uploadedImageUrl" class="uploaded-img">
-              <div class="change-hint">点击更换照片</div>
-            </div>
-          </el-upload>
+          <!-- 隐藏的原生 Input 用于更精准的控制 -->
+          <input type="file" ref="cameraInput" accept="image/*" capture="user" style="display: none" @change="onFileChange">
+          <input type="file" ref="galleryInput" accept="image/*" style="display: none" @change="onFileChange">
+
+          <div v-if="!uploadedImageUrl" class="upload-choice-container" v-loading="isUploading">
+            <!-- 移动端：双按钮模式 -->
+            <template v-if="isMobile">
+              <div class="choice-item camera" @click="triggerCamera">
+                <div class="choice-icon"><el-icon><Camera /></el-icon></div>
+                <span>拍照拍摄</span>
+              </div>
+              <div class="choice-divider"></div>
+              <div class="choice-item gallery" @click="triggerGallery">
+                <div class="choice-icon"><el-icon><Picture /></el-icon></div>
+                <span>从相册选取</span>
+              </div>
+            </template>
+
+            <!-- 电脑端：标准上传模式 -->
+            <template v-else>
+              <el-upload 
+                class="desktop-full-upload" 
+                drag 
+                action="#" 
+                :auto-upload="false" 
+                :show-file-list="false" 
+                :on-change="handleUpload"
+                accept="image/*"
+              >
+                <div class="desktop-upload-content">
+                  <el-icon class="upload-icon"><Plus /></el-icon>
+                  <div class="upload-text">点击上传 或 将照片拖拽到此处</div>
+                  <div class="upload-subtext">支持 JPG, PNG, WebP 格式</div>
+                </div>
+              </el-upload>
+            </template>
+          </div>
+
+          <div v-else class="preview-box glass-card" @click="uploadedImageUrl = ''">
+            <img :src="uploadedImageUrl" class="uploaded-img">
+            <div class="change-hint">点击更换照片</div>
+          </div>
         </div>
         <div v-if="uploadedImageUrl" class="save-face-action">
           <el-checkbox v-model="autoSaveFace">自动保存到形象库</el-checkbox>
@@ -670,23 +728,49 @@ h2 { color: #f7c873; font-size: 1.1rem; margin-bottom: 16px; font-weight: 700; }
 
 /* 上传区 */
 .upload-area { margin-bottom: 12px; }
-.upload-box { width: 100%; }
-:deep(.el-upload) { width: 100%; }
-:deep(.el-upload-dragger) {
-  width: 100%; height: 220px;
-  background:
-    linear-gradient(135deg, rgba(91,49,36,0.15), rgba(16,38,43,0.2)),
-    repeating-linear-gradient(0deg, rgba(247,200,115,0.03) 0 1px, transparent 1px 24px);
-  border: 2px dashed rgba(247,200,115,0.25); border-radius: 12px; display: flex;
-  align-items: center; justify-content: center; transition: border-color 0.3s;
+.upload-choice-container {
+  display: flex; height: 160px; border-radius: 12px; overflow: hidden;
+  background: linear-gradient(135deg, rgba(91,49,36,0.1), rgba(16,38,43,0.15));
+  border: 1px solid rgba(212, 167, 106, 0.2); position: relative;
 }
-:deep(.el-upload-dragger:hover) { border-color: #f7c873; }
-.upload-placeholder { text-align: center; color: var(--text-muted); }
-.preview-box { position: relative; width: 100%; height: 100%; }
-.uploaded-img { width: 100%; height: 100%; object-fit: contain; border-radius: 8px; }
+.choice-item {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 12px; cursor: pointer; transition: all 0.3s; color: var(--text-muted);
+}
+.choice-item:hover { background: rgba(212, 167, 106, 0.08); color: #f7c873; }
+.choice-icon {
+  width: 54px; height: 54px; border-radius: 50%; background: rgba(255,255,255,0.05);
+  display: flex; align-items: center; justify-content: center; font-size: 1.8rem;
+  border: 1px solid rgba(212, 167, 106, 0.1); transition: all 0.3s;
+}
+.choice-item:hover .choice-icon { border-color: #f7c873; transform: scale(1.1); box-shadow: 0 0 15px rgba(247,200,115,0.2); }
+.choice-item span { font-size: 0.9rem; font-weight: 600; }
+.choice-divider { width: 1px; background: rgba(212, 167, 106, 0.15); align-self: stretch; margin: 30px 0; }
+
+/* 电脑端上传样式 */
+.desktop-full-upload { width: 100%; height: 100%; }
+:deep(.el-upload) { width: 100%; height: 100%; }
+:deep(.el-upload-dragger) {
+  width: 100%; height: 160px; background: transparent !important;
+  border: none !important; display: flex; align-items: center; justify-content: center;
+}
+.desktop-upload-content {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+}
+.upload-icon { font-size: 2.2rem; color: var(--primary-color); opacity: 0.8; }
+.upload-text { font-size: 0.95rem; font-weight: 600; color: #fff8e6; }
+.upload-subtext { font-size: 0.75rem; color: var(--text-muted); }
+
+@media (min-width: 768px) {
+  .upload-choice-container { height: 180px; }
+  :deep(.el-upload-dragger) { height: 180px; }
+}
+
+.preview-box { position: relative; width: 100%; height: 220px; display: flex; align-items: center; justify-content: center; padding: 10px; border: 2px solid #f7c873; box-sizing: border-box; }
+.uploaded-img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 4px; }
 .change-hint {
-  position: absolute; bottom: 0; left: 0; right: 0; text-align: center; padding: 8px;
-  background: rgba(0,0,0,0.6); color: #fff; font-size: 0.8rem; border-radius: 0 0 8px 8px;
+  position: absolute; bottom: 0; left: 0; right: 0; text-align: center; padding: 6px;
+  background: rgba(0,0,0,0.6); color: #fff; font-size: 0.75rem; border-radius: 0 0 4px 4px;
 }
 .hint-text { font-size: 0.8rem; color: var(--text-muted); text-align: center; margin-top: 8px; }
 
