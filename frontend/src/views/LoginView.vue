@@ -3,9 +3,9 @@
     <div class="login-card glass-card">
       <div class="logo">
         <span class="emoji">✨</span>
-        <h2>AI女神约拍</h2>
+        <h2>唐师傅的AI老照相馆</h2>
       </div>
-      <p class="subtitle">{{ isLogin ? '欢迎回来' : '开启女神约拍之旅' }}</p>
+      <p class="subtitle">{{ isLogin ? '欢迎回来' : '开启时光留影之旅' }}</p>
 
       <el-form :model="form" :rules="rules" ref="formRef" @submit.prevent="handleSubmit">
         <el-form-item prop="email">

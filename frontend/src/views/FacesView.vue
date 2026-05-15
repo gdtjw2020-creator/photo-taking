@@ -42,7 +42,7 @@ onMounted(() => {
   <div class="faces-container">
     <div class="header">
       <h1>形象存档</h1>
-      <p>管理您的专属形象，永久保存以便随时约拍</p>
+      <p>管理您的专属形象，永久保存以便随时留影</p>
     </div>
 
     <div v-loading="isLoading" class="face-grid">
@@ -59,7 +59,7 @@ onMounted(() => {
           <h3>{{ face.name }}</h3>
           <p>{{ new Date(face.created_at).toLocaleDateString() }} 保存</p>
           <div class="actions">
-            <el-button size="small" type="primary" @click="$router.push({ name: 'generate', query: { face_url: face.face_url } })">去约拍</el-button>
+            <el-button size="small" type="primary" @click="$router.push({ name: 'generate', query: { face_url: face.face_url } })">去拍照</el-button>
             <el-button size="small" type="danger" plain @click="deleteFace(face.id)">删除</el-button>
           </div>
         </div>

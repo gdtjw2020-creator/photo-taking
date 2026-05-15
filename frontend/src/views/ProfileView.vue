@@ -11,7 +11,7 @@ const authStore = useAuthStore()
 const isLoggedIn = computed(() => authStore.isLoggedIn)
 
 const user = ref({
-  username: '女神体验官',
+  username: '时光体验官',
   email: '',
   credits: 0,
   avatar: 'https://placehold.co/100x100/png?text=Avatar'
@@ -27,7 +27,7 @@ onMounted(async () => {
     // 获取个人资料
     const profileRes = await api.get('/api/user/profile')
     user.value = {
-      username: profileRes.data.username || authStore.user?.email?.split('@')[0] || '女神用户',
+      username: profileRes.data.username || authStore.user?.email?.split('@')[0] || '雅致宾客',
       email: authStore.user?.email || '',
       credits: profileRes.data.credits,
       avatar: profileRes.data.avatar_url || user.value.avatar
@@ -133,7 +133,7 @@ const openRedeemDialog = () => {
     <div v-if="isLoggedIn" class="logs-list glass-card">
       <div v-for="log in creditLogs" :key="log.id" class="log-item">
         <div class="log-main">
-          <div class="log-desc">{{ log.description || (log.type === 'recharge' ? '积分充值' : '约拍消耗') }}</div>
+          <div class="log-desc">{{ log.description || (log.type === 'recharge' ? '积分充值' : '影艺消耗') }}</div>
           <div class="log-time">{{ new Date(log.created_at).toLocaleString('zh-CN', {month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'}) }}</div>
         </div>
         <div class="log-amount" :class="log.amount > 0 ? 'plus' : 'minus'">
@@ -171,7 +171,7 @@ const openRedeemDialog = () => {
     </el-dialog>
 
     <div v-if="!isLoggedIn" class="guest-tip">
-        <el-empty description="登录后即可查看您的专属约拍作品集">
+        <el-empty description="登录后即可查看您的专属留影作品集">
             <el-button type="primary" @click="goToLogin">立即登录</el-button>
         </el-empty>
     </div>

@@ -116,7 +116,7 @@ const goBack = () => {
   router.push('/')
 }
 
-const checkAuth = (msg = '请先登录后开启您的约拍之旅') => {
+const checkAuth = (msg = '请先登录后开启您的时光留影之旅') => {
   if (!isLoggedIn.value) {
     ElMessageBox.confirm(
       msg,
@@ -209,7 +209,7 @@ const selectSavedFace = (face) => {
 }
 
 const submitTask = async () => {
-  if (!checkAuth('开启 AI 约拍任务需要登录以扣除积分')) return
+  if (!checkAuth('开启 AI 留影任务需要登录以扣除积分')) return
 
   // ========== MVP 模式校验 ==========
   if (currentMode.value === 'classic_style') {
@@ -340,14 +340,14 @@ const startPolling = (tid, existingStartTime = null) => {
       if (data.output_urls && data.output_urls.length > resultImages.value.length) {
           resultImages.value = data.output_urls
           ElMessage({
-              message: `第 ${data.output_urls.length} 张约拍照已冲洗完成，扣除 1 积分`,
+              message: `第 ${data.output_urls.length} 张留影照已冲洗完成，扣除 1 积分`,
               type: 'success',
               duration: 2000
           })
       }
 
       if (data.status === 'completed') {
-        ElMessage.success('全组照片约拍完成！')
+        ElMessage.success('全组照片冲洗完成！')
         stopPolling()
       } else if (data.status === 'failed') {
         errorMessage.value = data.error_message || '任务生成失败，请重试'
@@ -463,7 +463,14 @@ const downloadAll = async () => {
         <p class="sub-hint">上传您心仪的参考图，唐师傅会照着构图和气氛给您重拍。</p>
         <div class="ref-list">
           <div v-for="(img, idx) in referenceImages" :key="idx" class="ref-item">
-            <el-image :src="img" fit="cover" class="ref-img"></el-image>
+            <el-image 
+              :src="img" 
+              fit="cover" 
+              class="ref-img"
+              :preview-src-list="referenceImages"
+              :initial-index="idx"
+              preview-teleported
+            ></el-image>
             <div class="del-btn" @click.stop="removeRef(idx)"><el-icon><Close /></el-icon></div>
           </div>
           <el-upload v-if="referenceImages.length < 3" class="ref-upload-box" action="#" :auto-upload="false" :show-file-list="false" :on-change="handleRefUpload" accept="image/*">

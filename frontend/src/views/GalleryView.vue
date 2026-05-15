@@ -22,7 +22,7 @@ const fetchGallery = async () => {
     const res = await api.get('/api/photoshoot/gallery')
     const photos = []
     res.data.forEach(task => {
-      let moduleName = 'AI 约拍'
+      let moduleName = '精品留影'
       if (task.module_type === 'classic_style') moduleName = '时代艺术照'
       else if (task.module_type === 'darkroom_random') moduleName = '暗房盲盒'
       else if (task.module_type === 'reference_shoot') moduleName = '照着样子拍'
@@ -111,7 +111,7 @@ onMounted(() => {
 <template>
   <div class="gallery-container">
     <div class="header">
-      <h1>我的约拍相册</h1>
+      <h1>我的留影相册</h1>
       <p>记录您的每一个精彩瞬间 (最近 30 天)</p>
     </div>
 
@@ -147,11 +147,11 @@ onMounted(() => {
 
     <p v-if="isMobile && myPhotos.length > 0" class="mobile-hint">提示：长按图片即可保存到相册，或点击图片右下角按钮一键下载</p>
 
-    <el-empty v-if="!isLoading && isLoggedIn && myPhotos.length === 0" description="暂无约拍作品，快去开启第一次约拍吧！">
-        <el-button type="primary" @click="router.push('/generate')">去约拍</el-button>
+    <el-empty v-if="!isLoading && isLoggedIn && myPhotos.length === 0" description="暂无影艺作品，快去开启第一次留影吧！">
+        <el-button type="primary" @click="router.push('/generate')">去拍照</el-button>
     </el-empty>
 
-    <el-empty v-if="!isLoggedIn" description="登录后即可查看您的专属约拍作品集">
+    <el-empty v-if="!isLoggedIn" description="登录后即可查看您的专属留影作品集">
         <el-button type="primary" @click="goToLogin">立即登录</el-button>
     </el-empty>
   </div>
