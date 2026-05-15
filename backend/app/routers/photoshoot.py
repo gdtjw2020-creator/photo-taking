@@ -477,8 +477,8 @@ async def process_photoshoot_task(task_id: str, user_id: str, input_url: Optiona
                                     print(f"✅ [DEBUG] Successfully stored Base64 to R2: {final_url}")
                             # 处理 URL
                             else:
-                                async with httpx.AsyncClient() as client:
-                                    resp = await client.get(external_url, timeout=60.0)
+                                async with ai_service.get_client_by_url(external_url, timeout=60.0) as client:
+                                    resp = await client.get(external_url)
                                     if resp.status_code == 200:
                                         watermarked_content = apply_watermark_to_bytes(resp.content) if watermark else resp.content
                                         
@@ -524,7 +524,7 @@ async def process_photoshoot_task(task_id: str, user_id: str, input_url: Optiona
 async def proxy_download(url: str):
     """代理下载图片，解决前端跨域限制导致的下载失败问题"""
     async def stream_image():
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with ai_service.get_client_by_url(url, timeout=30.0) as client:
             try:
                 async with client.stream("GET", url) as response:
                     if response.status_code != 200:

@@ -8,7 +8,7 @@ from ..config import (
     AI_API_KEY, AI_BASE_URL, AI_MODEL_NAME, AI_IMAGE_SIZE, AI_IMAGE_QUALITY,
     AI_IMAGE_OUTPUT_FORMAT, AI_IMAGE_MODERATION, AI_POLL_INTERVAL_SECONDS, AI_POLL_MAX_ATTEMPTS,
     AI_PROVIDER, OPENROUTER_API_KEY, OPENROUTER_MODEL,
-    AI_API_KEY, AI_BASE_URL
+    AI_API_KEY, AI_BASE_URL, AI_PROXY
 )
 from openai import AsyncOpenAI
 
@@ -23,26 +23,44 @@ class AIService:
         self.moderation = AI_IMAGE_MODERATION
         self.poll_interval = AI_POLL_INTERVAL_SECONDS
         self.poll_max_attempts = AI_POLL_MAX_ATTEMPTS
+        self.proxy = AI_PROXY
         
-        # Initialize OpenAI Client (Unified)
-        self.openai_client = AsyncOpenAI(
-            api_key=self.api_key,
-            base_url=self.base_url
-        )
-
-    async def upload_file(self, file_content: bytes, filename: str) -> Optional[str]:
-        """上传图片到第三方平台，获取一个他们能直接访问的内部 URL"""
-        url = f"{self.base_url}/v1/files"
-        headers = {"Authorization": f"Bearer {self.api_key}"}
-        
-        # 使用 multipart/form-data 格式
-        files = {
-            "file": (filename, file_content, "image/png")
+        # Initialize OpenAI Client (Unified) with Proxy Support
+        client_args = {
+            "api_key": self.api_key,
+            "base_url": self.base_url
         }
         
+        if self.proxy:
+            print(f"🌐 [AI] Using proxy: {self.proxy}")
+            # OpenAI SDK accepts a custom http_client
+            # Note: For socks5, user must install 'httpx[socks]'
+            client_args["http_client"] = httpx.AsyncClient(
+                proxies=self.proxy,
+                timeout=60.0,
+                follow_redirects=True
+            )
+            
+        self.openai_client = AsyncOpenAI(**client_args)
+
+    def _get_proxy_client(self, timeout=60.0):
+        """专门用于 AI 相关请求（OpenAI, OpenRouter, 第三方生图站）的客户端，走代理"""
+        if self.proxy:
+            return httpx.AsyncClient(proxies=self.proxy, timeout=timeout, follow_redirects=True)
+        return httpx.AsyncClient(timeout=timeout)
+
+    def _get_direct_client(self, timeout=30.0):
+        """用于直连请求（如 R2, 本地文件, 已经转存后的 URL），不走代理"""
+        return httpx.AsyncClient(timeout=timeout)
+
+    async def upload_file(self, file_content: bytes, filename: str) -> Optional[str]:
+        """上传图片到第三方平台 (注意：如果这是 AI 平台，走代理)"""
+        url = f"{self.base_url}/v1/files"
+        headers = {"Authorization": f"Bearer {self.api_key}"}
+        files = {"file": (filename, file_content, "image/png")}
+        
         try:
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                # 注意：httpx 的 files 参数用法
+            async with self._get_proxy_client(timeout=60.0) as client:
                 response = await client.post(url, headers=headers, files=files)
                 if response.status_code == 200:
                     result = response.json()
@@ -53,6 +71,15 @@ class AIService:
         except Exception as e:
             print(f"❌ 上传到平台异常: {str(e)}")
             return None
+            
+    def get_client_by_url(self, url: str, timeout=60.0):
+        """根据 URL 自动决定是否走代理 (OpenAI 结果图走代理，R2/国内 CDN 走直连)"""
+        # 如果是 OpenAI 域名或第三方生图平台结果，通常需要走代理
+        proxy_keywords = ["openai.com", "api.openai.com", "oaidalleapiprodscus", "oaidalleapiprod"]
+        if any(k in url for k in proxy_keywords):
+            return self._get_proxy_client(timeout)
+        # 否则默认直连 (R2, 本地等)
+        return self._get_direct_client(timeout)
 
     async def generate_images(self, input_url: Optional[str], prompt: str, ref_url: Optional[str] = None, size: str = "auto", quality: str = "auto") -> List[str]:
         """
@@ -98,8 +125,8 @@ class AIService:
                 # ===== 有图片 → 走 images.edit() 接口 =====
                 image_buffers = []
                 
-                # 下载图片到内存（先场景底图，后人脸参考图）
-                async with httpx.AsyncClient(timeout=60.0) as dl:
+                # 下载图片到内存（底图通常在 R2，走直连）
+                async with self._get_direct_client(timeout=60.0) as dl:
                     if ref_url:
                         r = await dl.get(ref_url)
                         if r.status_code == 200:
@@ -205,8 +232,8 @@ class AIService:
         }
         
         try:
-            # 延长超时时间以支持生图
-            async with httpx.AsyncClient(timeout=180.0) as client:
+            # 延长超时时间以支持生图，OpenRouter 接口走代理
+            async with self._get_proxy_client(timeout=180.0) as client:
                 response = await client.post(url, headers=headers, json=payload)
                 
                 if response.status_code != 200:
@@ -256,10 +283,10 @@ class AIService:
         job_no = random.randint(100, 999)
         try:
             # 0. 预处理：下载图片用于表单提交
-            print(f"🔄 [任务#{job_no}] 正在下载参考图片...")
+            print(f"🔄 [任务#{job_no}] 正在从 R2 下载参考图片...")
             image_bytes_list = []
             
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with self._get_direct_client(timeout=30.0) as client:
                 # 下载图1 (动作参考图/底图) - 物理位置必须在第一位 (image_0)
                 if ref_url:
                     resp2 = await client.get(ref_url)
@@ -392,7 +419,8 @@ class AIService:
         print(f"===================================================")
 
         try:
-            async with httpx.AsyncClient(timeout=60.0) as client:
+            # 提交任务到第三方平台，走代理
+            async with self._get_proxy_client(timeout=60.0) as client:
                 response = await client.post(url, headers=headers, data=data, files=files)
                 result = response.json()
                 
@@ -413,7 +441,8 @@ class AIService:
         headers = {"Authorization": f"Bearer {self.api_key}"}
         
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            # 查询任务状态，走代理
+            async with self._get_proxy_client(timeout=10.0) as client:
                 response = await client.get(url, headers=headers)
                 if response.status_code == 200:
                     return response.json()

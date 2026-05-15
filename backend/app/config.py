@@ -10,6 +10,7 @@ AI_PROVIDER = os.getenv("AI_PROVIDER", "zhenzhen").lower() # 'zhenzhen', 'openro
 # AI API 配置 (所有提供商公用)
 AI_API_KEY = os.getenv("AI_API_KEY", "")
 AI_BASE_URL = os.getenv("AI_BASE_URL", "https://api.openai-proxy.com/v1")
+AI_PROXY = os.getenv("AI_PROXY", "") # 例如: http://1.2.3.4:1080 或 socks5://1.2.3.4:1080
 
 # 中间商 AI API配置 (GPT-image2)
 AI_API_KEY = os.getenv("AI_API_KEY", "")
