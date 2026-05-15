@@ -431,7 +431,7 @@ const downloadAll = async () => {
             <div class="old-style-img-container"><div class="old-style-placeholder"><span class="placeholder-era-icon">📷</span></div></div>
             <div class="old-style-info">
               <span class="old-style-name">{{ style.name }}</span>
-              <span class="old-style-desc">{{ style.description }}</span>
+              <span class="old-style-desc" :title="style.description">{{ style.description }}</span>
             </div>
           </div>
         </div>

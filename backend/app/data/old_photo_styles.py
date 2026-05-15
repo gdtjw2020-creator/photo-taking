@@ -198,6 +198,28 @@ OLD_PHOTO_STYLES: List[Dict[str, object]] = [
             ),
         ],
     },
+    {
+        "id": "educated_youth",
+        "name": "知青下乡",
+        "description": "军帽、白衬衫、田野背景，60-70 年代知青上山下乡纪念照。",
+        "preview_url": "",
+        "tags": ["countryside", "youth", "1960s", "documentary"],
+        "recommended_count": 2,
+        "prompts": [
+            _prompt(
+                "1960s-1970s Chinese educated youth countryside portrait, plain "
+                "white shirt, army green hat, rural farmland or village backdrop, "
+                "earnest youthful expression, outdoor natural light, warm sepia "
+                "documentary film tone, slightly faded and aged print"
+            ),
+            _prompt(
+                "vintage Chinese sent-down youth commemorative photo, simple "
+                "cotton work shirt, rolled-up sleeves, wheat field or terraced "
+                "hillside background, half-body composition, candid natural pose, "
+                "soft golden hour side light, realistic 1970s color film grain"
+            ),
+        ],
+    },
 ]
 
 
