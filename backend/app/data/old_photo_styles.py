@@ -29,7 +29,7 @@ OLD_PHOTO_STYLES: List[Dict[str, object]] = [
         "id": "worker_soldier_portrait",
         "name": "工农兵肖像",
         "description": "黑白做旧半身照，端正、朴素、有老档案馆质感。",
-        "preview_url": "",
+        "preview_url": "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?q=80&w=400&h=500&auto=format&fit=crop&sepia=100",
         "tags": ["black_and_white", "studio", "portrait", "1950s"],
         "recommended_count": 2,
         "prompts": [
@@ -51,7 +51,7 @@ OLD_PHOTO_STYLES: List[Dict[str, object]] = [
         "id": "hong_kong_star",
         "name": "港风女星",
         "description": "暖黄灯、蓬松发型、胶片颗粒感的港风明星照。",
-        "preview_url": "",
+        "preview_url": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=400&h=500&auto=format&fit=crop",
         "tags": ["hong_kong", "cinematic", "warm_light", "1980s"],
         "recommended_count": 3,
         "prompts": [
@@ -73,7 +73,7 @@ OLD_PHOTO_STYLES: List[Dict[str, object]] = [
         "id": "shanghai_lady",
         "name": "上海名媛",
         "description": "旗袍、柔光、老上海影楼氛围，适合精致半身照。",
-        "preview_url": "",
+        "preview_url": "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?q=80&w=400&h=500&auto=format&fit=crop",
         "tags": ["shanghai", "qipao", "soft_light", "republic_era"],
         "recommended_count": 3,
         "prompts": [
@@ -95,7 +95,7 @@ OLD_PHOTO_STYLES: List[Dict[str, object]] = [
         "id": "republic_student",
         "name": "民国学生",
         "description": "蓝衫黑裙或学生长衫，清爽书卷气的民国学生照。",
-        "preview_url": "",
+        "preview_url": "https://images.unsplash.com/photo-1517841905240-472988babdf9?q=80&w=400&h=500&auto=format&fit=crop",
         "tags": ["student", "republic_era", "clean", "youth"],
         "recommended_count": 2,
         "prompts": [
@@ -116,7 +116,7 @@ OLD_PHOTO_STYLES: List[Dict[str, object]] = [
         "id": "disco_80s",
         "name": "八零迪斯科",
         "description": "彩色灯光、动感姿势、复古舞厅味道的 80 年代照片。",
-        "preview_url": "",
+        "preview_url": "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?q=80&w=400&h=500&auto=format&fit=crop",
         "tags": ["disco", "color", "1980s", "dynamic"],
         "recommended_count": 3,
         "prompts": [
@@ -137,7 +137,7 @@ OLD_PHOTO_STYLES: List[Dict[str, object]] = [
         "id": "model_opera",
         "name": "革命样板戏",
         "description": "军装或工装，昂首挺胸，舞台宣传照式的年代感。",
-        "preview_url": "",
+        "preview_url": "https://images.unsplash.com/photo-1509062522246-3755977927d7?q=80&w=400&h=500&auto=format&fit=crop",
         "tags": ["stage", "red", "uniform", "1970s"],
         "recommended_count": 2,
         "prompts": [
@@ -159,7 +159,7 @@ OLD_PHOTO_STYLES: List[Dict[str, object]] = [
         "id": "studio_90s",
         "name": "九十年代影楼风",
         "description": "柔焦、纱巾、影楼布景，典型 90 年代写真质感。",
-        "preview_url": "",
+        "preview_url": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400&h=500&auto=format&fit=crop",
         "tags": ["studio", "soft_focus", "1990s", "portrait"],
         "recommended_count": 3,
         "prompts": [
@@ -180,7 +180,7 @@ OLD_PHOTO_STYLES: List[Dict[str, object]] = [
         "id": "beijing_photo_studio",
         "name": "老北京照相馆",
         "description": "长袍马褂、旗袍或正装，正襟危坐的老照相馆合影感。",
-        "preview_url": "",
+        "preview_url": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=400&h=500&auto=format&fit=crop",
         "tags": ["beijing", "studio", "formal", "vintage"],
         "recommended_count": 2,
         "prompts": [
@@ -202,7 +202,7 @@ OLD_PHOTO_STYLES: List[Dict[str, object]] = [
         "id": "educated_youth",
         "name": "知青下乡",
         "description": "军帽、白衬衫、田野背景，60-70 年代知青上山下乡纪念照。",
-        "preview_url": "",
+        "preview_url": "https://images.unsplash.com/photo-1488161628813-04466f872be2?q=80&w=400&h=500&auto=format&fit=crop",
         "tags": ["countryside", "youth", "1960s", "documentary"],
         "recommended_count": 2,
         "prompts": [

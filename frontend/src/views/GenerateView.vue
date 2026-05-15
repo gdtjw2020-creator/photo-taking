@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { ElMessage, ElLoading, ElMessageBox } from 'element-plus'
 import { Loading, ZoomIn, Close, Plus, Download, Camera, Picture } from '@element-plus/icons-vue'
 import api from '../api'
@@ -16,6 +16,7 @@ const CREDITS_PER_IMAGE = ref(5) // 默认为 5，之后从后端动态同步
 // ========== MVP 模式支持 ==========
 const currentMode = computed(() => route.query.mode || null)
 const oldPhotoStyles = ref([])
+const isLoadingStyles = ref(false)
 const selectedStyle = ref(null)
 const darkroomPackage = ref(3)
 const promptMode = ref('similar')
@@ -47,6 +48,28 @@ const submitButtonText = computed(() => {
 
 const savedFaces = ref([])
 
+const loadStyles = async () => {
+  if (currentMode.value === 'classic_style') {
+    if (oldPhotoStyles.value.length > 0) return // Already loaded
+    
+    isLoadingStyles.value = true
+    try {
+      const stylesRes = await api.get('/api/photoshoot/old_photo_styles')
+      oldPhotoStyles.value = stylesRes.data
+    } catch (err) {
+      console.error('Failed to load old photo styles:', err)
+      ElMessage.error('加载年代风格失败，请刷新重试')
+    } finally {
+      isLoadingStyles.value = false
+    }
+  }
+}
+
+// 监听模式变化，确保在切换到相关模式时加载风格
+watch(() => currentMode.value, () => {
+  loadStyles()
+})
+
 onMounted(async () => {
   try {
     // 同步后端配置（实现环境变量统一）
@@ -56,14 +79,7 @@ onMounted(async () => {
     }
 
     // 加载老照片风格
-    if (currentMode.value === 'classic_style' || currentMode.value === 'darkroom_random') {
-      try {
-        const stylesRes = await api.get('/api/photoshoot/old_photo_styles')
-        oldPhotoStyles.value = stylesRes.data
-      } catch (err) {
-        console.error('Failed to load old photo styles:', err)
-      }
-    }
+    await loadStyles()
     
     // 加载已存形象 (仅登录用户)
     if (isLoggedIn.value) {
@@ -140,10 +156,12 @@ const cameraInput = ref(null)
 const galleryInput = ref(null)
 
 const triggerCamera = () => {
+  if (!checkAuth('拍照前需要登录，以便为您保存形象存档')) return
   if (cameraInput.value) cameraInput.value.click()
 }
 
 const triggerGallery = () => {
+  if (!checkAuth('从相册选取前需要登录，以便为您保存形象存档')) return
   if (galleryInput.value) galleryInput.value.click()
 }
 
@@ -461,9 +479,19 @@ const downloadAll = async () => {
       <!-- ===== 时代艺术照 Step 1 ===== -->
       <div v-if="currentMode === 'classic_style'" class="step-card glass-card">
         <h2>1. 选择年代风格</h2>
-        <div class="old-style-grid">
+        <div class="old-style-grid" v-loading="isLoadingStyles" element-loading-background="rgba(0, 0, 0, 0.3)">
           <div v-for="style in oldPhotoStyles" :key="style.id" class="old-style-item" :class="{ active: selectedStyle?.id === style.id }" @click="selectOldStyle(style)">
-            <div class="old-style-img-container"><div class="old-style-placeholder"><span class="placeholder-era-icon">📷</span></div></div>
+            <div class="old-style-img-container">
+              <el-image v-if="style.preview_url" :src="style.preview_url" fit="cover" class="old-style-img" lazy>
+                <template #placeholder>
+                  <div class="old-style-placeholder"><el-icon class="is-loading"><Loading /></el-icon></div>
+                </template>
+                <template #error>
+                  <div class="old-style-placeholder"><span class="placeholder-era-icon">📷</span></div>
+                </template>
+              </el-image>
+              <div v-else class="old-style-placeholder"><span class="placeholder-era-icon">📷</span></div>
+            </div>
             <div class="old-style-info">
               <span class="old-style-name">{{ style.name }}</span>
               <span class="old-style-desc" :title="style.description">{{ style.description }}</span>
@@ -758,14 +786,15 @@ h2 { color: #f7c873; font-size: 1.1rem; margin-bottom: 16px; font-weight: 700; }
 }
 .old-style-item.active { border-color: #f7c873; box-shadow: 0 0 16px rgba(247,200,115,0.3); background: rgba(247,200,115,0.08); }
 .old-style-item:hover { border-color: rgba(247,200,115,0.4); transform: translateY(-2px); }
-.old-style-img-container { width: 100%; aspect-ratio: 4/5; overflow: hidden; }
+.old-style-img-container { width: 100%; aspect-ratio: 4/5; overflow: hidden; background: rgba(0,0,0,0.2); }
+.old-style-img { width: 100%; height: 100%; transition: transform 0.5s; }
+.old-style-item:hover .old-style-img { transform: scale(1.1); }
 .old-style-placeholder {
   width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
   background:
-    radial-gradient(circle at 50% 28%, rgba(213,177,138,0.25) 0 13%, transparent 14%),
-    radial-gradient(ellipse at 50% 78%, rgba(108,63,53,0.2) 0 30%, transparent 31%),
-    linear-gradient(180deg, rgba(99,113,106,0.5), rgba(60,74,72,0.6));
+    linear-gradient(135deg, rgba(139, 107, 67, 0.15), rgba(26, 22, 20, 0.25));
   filter: sepia(0.4) contrast(0.9);
+  color: #f7c873;
 }
 .placeholder-era-icon { font-size: 2.2rem; opacity: 0.6; }
 .old-style-info { padding: 8px 10px 4px; display: flex; flex-direction: column; gap: 3px; }
