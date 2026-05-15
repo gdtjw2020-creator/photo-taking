@@ -7,8 +7,9 @@ from typing import Dict, List, Optional
 
 IDENTITY_GUARDRAIL = (
     "Use the uploaded portrait as the identity reference. Preserve the person's "
-    "facial identity, facial structure, age impression, natural expression, and "
-    "recognizable features. Do not change identity, ethnicity, age, or gender."
+    "facial identity, facial structure, and recognizable features. The facial "
+    "expression and eye gaze should naturally adapt to the specific style and "
+    "mood while maintaining the person's core resemblance."
 )
 
 PHOTO_REALISM_GUARDRAIL = (
@@ -36,14 +37,16 @@ OLD_PHOTO_STYLES: List[Dict[str, object]] = [
             _prompt(
                 "1950s Chinese worker-soldier studio portrait, black and white, "
                 "plain cotton work jacket, upright half-body pose, simple cloth "
-                "backdrop, modest expression, archival photo texture, slightly "
-                "faded paper print"
+                "backdrop, steady unwavering gaze fixed on the horizon, firm and "
+                "hopeful expression reflecting industrial pride, archival photo "
+                "texture, slightly faded paper print"
             ),
             _prompt(
                 "old Chinese state-owned photo studio portrait, monochrome film, "
                 "buttoned workwear, direct frontal composition, soft overhead "
-                "light, solemn but warm expression, subtle scratches and aged "
-                "silver gelatin print feeling"
+                "light, calm eyes with a look of simple honesty and duty, solemn "
+                "but warm micro-expression, subtle scratches and aged silver "
+                "gelatin print feeling"
             ),
         ],
     },
@@ -58,14 +61,16 @@ OLD_PHOTO_STYLES: List[Dict[str, object]] = [
             _prompt(
                 "1980s Hong Kong movie star portrait, warm tungsten studio light, "
                 "voluminous hair, elegant retro makeup, glossy magazine still, "
-                "cinematic shallow depth of field, amber highlights, tasteful "
-                "glamour without changing identity"
+                "heavy-lidded cinematic eyes reflecting studio umbrellas, "
+                "charismatic gaze looking slightly past the lens, misty glamorous "
+                "ambiance, cinematic shallow depth of field, amber highlights"
             ),
             _prompt(
                 "classic Hong Kong film publicity portrait, warm yellow key light, "
-                "soft rim light, retro blouse, expressive but natural pose, 35mm "
-                "film grain, nostalgic color grading, realistic celebrity photo "
-                "studio atmosphere"
+                "soft rim light, retro blouse, expressive natural pose, vibrant "
+                "eyes that tell a story, mysterious and alluring subtle smile, "
+                "35mm film grain, nostalgic color grading, realistic celebrity "
+                "photo studio atmosphere"
             ),
         ],
     },
@@ -80,14 +85,16 @@ OLD_PHOTO_STYLES: List[Dict[str, object]] = [
             _prompt(
                 "1930s old Shanghai elegant qipao portrait, refined silk qipao, "
                 "soft diffused studio lighting, side-facing three-quarter pose, "
-                "painted studio backdrop, graceful expression, subtle sepia color, "
-                "authentic Republican-era photo studio style"
+                "painted studio backdrop, demure half-smile, eyes with a hint of "
+                "melancholic grace and sophisticated depth, graceful expression, "
+                "subtle sepia color, authentic Republican-era photo studio style"
             ),
             _prompt(
                 "vintage Shanghai socialite photo, tailored qipao, delicate hair "
                 "waves, pearl earrings, warm softbox lighting, seated portrait "
-                "composition, old studio backdrop, faded color film, refined and "
-                "realistic"
+                "composition, old studio backdrop, sophisticated sideways look, "
+                "elegant nostalgic gaze reflecting the golden era, faded color "
+                "film, refined and realistic"
             ),
         ],
     },
@@ -101,14 +108,16 @@ OLD_PHOTO_STYLES: List[Dict[str, object]] = [
         "prompts": [
             _prompt(
                 "Republican-era Chinese student portrait, simple blue student "
-                "jacket and dark skirt or long gown, neat hairstyle, bookish and "
-                "fresh temperament, school photo studio backdrop, soft daylight, "
-                "slightly aged paper texture"
+                "jacket and dark skirt or long gown, neat hairstyle, wide-eyed "
+                "innocence, look of pure determination and scholarship, school "
+                "photo studio backdrop, soft daylight, slightly aged paper "
+                "texture, clear-eyed intellectual curiosity"
             ),
             _prompt(
-                "old Chinese campus studio portrait from the 1920s to 1930s, "
-                "clean student uniform, reserved natural smile, upright half-body "
-                "composition, muted colors, gentle film grain, documentary realism"
+                "old Chinese campus studio portrait, clean student uniform, "
+                "earnest and intelligent gaze, reserved but sincere smile, eyes "
+                "reflecting youthful ideals, upright half-body composition, "
+                "muted colors, gentle film grain, documentary realism"
             ),
         ],
     },
@@ -122,14 +131,16 @@ OLD_PHOTO_STYLES: List[Dict[str, object]] = [
         "prompts": [
             _prompt(
                 "1980s Chinese disco studio portrait, colorful neon party lights, "
-                "retro patterned shirt or bright dress, confident dynamic pose, "
+                "retro patterned shirt or bright dress, exuberant wide smile, "
+                "dynamic eyes full of party energy, vibrant and confident pose, "
                 "slightly glossy film look, dance hall atmosphere, realistic "
                 "snapshot energy"
             ),
             _prompt(
                 "old 1980s dance hall photo, saturated but faded colors, side "
-                "lighting, stylish retro hair, lively pose, film flash effect, "
-                "subtle motion feeling, authentic period clothing and background"
+                "lighting, stylish retro hair, lively pose, eyes sparkling with "
+                "infectious excitement, cheerful retro expression, film flash "
+                "effect, authentic period clothing and background"
             ),
         ],
     },
@@ -144,14 +155,16 @@ OLD_PHOTO_STYLES: List[Dict[str, object]] = [
             _prompt(
                 "1970s Chinese revolutionary model opera publicity portrait, "
                 "period military-style uniform or workwear, proud upright pose, "
-                "red stage backdrop, dramatic but believable studio lighting, "
-                "heroic composition, vintage propaganda photo realism"
+                "red stage backdrop, dramatic theatrical eye contact, eyes "
+                "staring intensely with heroic passion, determined micro-expression, "
+                "vintage propaganda photo realism"
             ),
             _prompt(
                 "classic Chinese stage portrait inspired by revolutionary opera, "
-                "structured uniform, chest lifted, determined gaze, red curtain "
+                "structured uniform, chest lifted, determined gaze looking "
+                "upwards, eyes full of revolutionary spirit, red curtain "
                 "background, theatrical side light, aged color print texture, "
-                "realistic human proportions"
+                "exaggerated heroic smile, realistic human proportions"
             ),
         ],
     },
@@ -165,14 +178,17 @@ OLD_PHOTO_STYLES: List[Dict[str, object]] = [
         "prompts": [
             _prompt(
                 "1990s Chinese photo studio glamour portrait, soft focus lens, "
-                "light chiffon scarf, painted scenic backdrop, gentle pastel "
-                "colors, romantic studio pose, realistic old studio print, "
+                "light chiffon scarf, painted scenic backdrop, pensive gaze, "
+                "soft shy smile typical of 90s portraits, gentle dreamy eyes "
+                "looking into the distance, realistic old studio print, "
                 "tasteful and nostalgic"
             ),
             _prompt(
                 "classic 1990s Chinese portrait studio photo, dreamy soft light, "
-                "subtle vignette, decorative fabric prop, slightly overexposed "
-                "film print, posed half-body composition, authentic period styling"
+                "subtle vignette, decorative fabric prop, soft nostalgic gaze, "
+                "elegant half-body composition, eyes reflecting the softbox "
+                "umbrella lights, slightly overexposed film print, authentic "
+                "period styling"
             ),
         ],
     },
@@ -187,14 +203,15 @@ OLD_PHOTO_STYLES: List[Dict[str, object]] = [
             _prompt(
                 "old Beijing traditional photo studio portrait, formal seated "
                 "pose, long gown or elegant qipao styling as appropriate, carved "
-                "wood chair, plain studio curtain, calm expression, sepia toned "
-                "paper print, realistic early studio photography"
+                "wood chair, plain studio curtain, unblinking formal look, calm "
+                "and dignified gaze, wise steady eyes, sepia toned paper print, "
+                "realistic early studio photography"
             ),
             _prompt(
                 "vintage Beijing family photo studio style single portrait, "
-                "formal upright posture, traditional Chinese clothing details, "
-                "classic wooden furniture, muted warm sepia, old lens softness, "
-                "authentic aged photo surface"
+                "formal upright posture, strict traditional gaze, composed and "
+                "serious eyes, traditional Chinese clothing details, classic "
+                "wooden furniture, muted warm sepia, old lens softness"
             ),
         ],
     },
@@ -209,14 +226,16 @@ OLD_PHOTO_STYLES: List[Dict[str, object]] = [
             _prompt(
                 "1960s-1970s Chinese educated youth countryside portrait, plain "
                 "white shirt, army green hat, rural farmland or village backdrop, "
-                "earnest youthful expression, outdoor natural light, warm sepia "
-                "documentary film tone, slightly faded and aged print"
+                "weathered but shining eyes, sincere gaze fixed on the landscape, "
+                "resilient and earnest look, outdoor natural light, warm sepia "
+                "documentary film tone"
             ),
             _prompt(
                 "vintage Chinese sent-down youth commemorative photo, simple "
                 "cotton work shirt, rolled-up sleeves, wheat field or terraced "
-                "hillside background, half-body composition, candid natural pose, "
-                "soft golden hour side light, realistic 1970s color film grain"
+                "hillside background, eyes reflecting the vastness of the "
+                "countryside, resilient youthful expression, half-body "
+                "composition, candid natural pose, realistic 1970s color film grain"
             ),
         ],
     },

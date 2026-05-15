@@ -381,4 +381,28 @@ class SupabaseService:
             print(f"Error saving feedback: {e}")
             return False
 
+    def get_style_overrides(self) -> dict:
+        """从数据库获取风格覆盖配置 (如封面图)"""
+        if not self.supabase:
+            return {}
+        try:
+            res = self.supabase.table("photoshoot_styles").select("id, preview_url").execute()
+            return {item["id"]: item for item in res.data}
+        except Exception as e:
+            print(f"Error fetching style overrides: {e}")
+            return {}
+
+    def update_style_preview(self, style_id: str, preview_url: str) -> bool:
+        """更新或创建风格的预览图记录"""
+        if not self.supabase:
+            return True
+        try:
+            data = {"id": style_id, "preview_url": preview_url, "updated_at": datetime.now(timezone.utc).isoformat()}
+            # 使用 upsert
+            self.supabase.table("photoshoot_styles").upsert(data).execute()
+            return True
+        except Exception as e:
+            print(f"Error updating style preview: {e}")
+            return False
+
 supabase_service = SupabaseService()

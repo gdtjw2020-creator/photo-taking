@@ -205,17 +205,11 @@ class AIService:
             # 3. 组合存储: "友好提示 | [DEBUG] 原始报错"
             combined_error = f"{user_msg} | [DEBUG] {debug_info}"
             
-            job_no = task_id[-4:] if task_id else "unknown"
             print(f"‼️ [OpenAI任务#{job_no}] 异常详情: {raw_err}")
             traceback.print_exc()
             
-            if task_id and hasattr(self, 'supabase'):
-                self.supabase.update_task_status(
-                    task_id, 
-                    "failed", 
-                    error_message=combined_error
-                )
-            return []
+            # 注意：AI Service 内部不直接更新数据库状态，交由外层 photoshoot.py 统一处理
+            raise Exception(combined_error)
 
     async def _generate_openrouter(self, input_url: str, prompt: str) -> List[str]:
         """
@@ -298,7 +292,7 @@ class AIService:
         except Exception as e:
             print(f"‼️ [OpenRouter任务#{job_no}] 异常: {str(e)}")
             traceback.print_exc()
-            return []
+            raise e
 
     async def _generate_zhenzhen(self, input_url: str, prompt: str, ref_url: Optional[str] = None) -> List[str]:
         """

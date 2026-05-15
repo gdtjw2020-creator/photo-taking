@@ -13,7 +13,7 @@ from ..services.r2_service import r2_service
 from ..services.ai_service import ai_service
 from ..services.supabase_service import supabase_service
 from ..services.image_utils import add_ai_watermark, apply_watermark_to_bytes
-from ..dependencies import get_user_id, check_service_active
+from ..dependencies import get_user_id, get_admin_user, check_service_active
 from ..config import CREDITS_PER_PHOTOSHOOT, AI_IMAGE_QUALITY, AI_IMAGE_SIZE
 from ..data.old_photo_styles import get_old_photo_style, list_old_photo_styles
 from datetime import datetime
@@ -394,18 +394,60 @@ async def get_templates():
 
 @router.get("/old_photo_styles")
 async def get_old_photo_styles():
-    """获取唐师傅老照片风格列表，不返回完整 prompt。"""
+    """获取唐师傅老照片风格列表，优先从数据库获取封面图覆盖。"""
+    hardcoded_styles = list_old_photo_styles()
+    
+    # 尝试从数据库获取覆盖配置 (preview_url)
+    overrides = {}
+    try:
+        overrides = supabase_service.get_style_overrides()
+    except Exception as e:
+        print(f"Failed to fetch style overrides: {e}")
+        
     return [
         {
             "id": style["id"],
             "name": style["name"],
             "description": style["description"],
-            "preview_url": style["preview_url"],
+            "preview_url": overrides.get(style["id"], {}).get("preview_url") or style["preview_url"],
             "tags": style["tags"],
             "recommended_count": style["recommended_count"],
         }
-        for style in list_old_photo_styles()
+        for style in hardcoded_styles
     ]
+
+@router.post("/styles/{style_id}/cover")
+async def update_style_cover(
+    style_id: str,
+    file: UploadFile = File(...),
+    admin_id: str = Depends(get_admin_user)
+):
+    """管理员更新风格封面图"""
+    # 1. 上传图片到 R2
+    file_ext = os.path.splitext(file.filename)[1] or ".jpg"
+    temp_dir = "temp_uploads"
+    os.makedirs(temp_dir, exist_ok=True)
+    temp_path = os.path.join(temp_dir, f"style_cover_{style_id}_{uuid.uuid4().hex[:8]}{file_ext}")
+    
+    try:
+        with open(temp_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+            
+        object_name = f"photoshoots/styles/{style_id}/{os.path.basename(temp_path)}"
+        r2_url = r2_service.upload_file(temp_path, object_name)
+        
+        if not r2_url:
+            raise HTTPException(status_code=500, detail="图片上传 R2 失败")
+            
+        # 2. 更新数据库
+        success = supabase_service.update_style_preview(style_id, r2_url)
+        if not success:
+            raise HTTPException(status_code=500, detail="更新数据库记录失败")
+            
+        return {"id": style_id, "preview_url": r2_url}
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
 
 @router.get("/task_status")
 async def get_task_status(task_id: str):

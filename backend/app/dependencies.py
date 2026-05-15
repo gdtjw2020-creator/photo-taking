@@ -25,11 +25,17 @@ def get_user_id(authorization: Optional[str] = Header(None)) -> str:
     """强制要求登录，提取 user_id"""
     user_id = get_optional_user(authorization)
     if not user_id:
-        # 开发模式特殊处理：如果环境变量允许，返回测试 ID
-        from .config import DEBUG
-        if DEBUG:
-            return "00000000-0000-0000-0000-000000000001"
         raise HTTPException(status_code=401, detail="请先登录后操作")
+    return user_id
+
+def get_admin_user(user_id: str = Depends(get_user_id)) -> str:
+    """验证用户是否为管理员"""
+    from .services.supabase_service import supabase_service
+    profile = supabase_service.get_user_profile(user_id)
+    is_admin = profile.get("is_admin", False)
+    print(f"[DEBUG] Admin Check - User: {user_id}, is_admin: {is_admin}")
+    if not is_admin:
+        raise HTTPException(status_code=403, detail="需要管理员权限")
     return user_id
 
 def check_service_active():

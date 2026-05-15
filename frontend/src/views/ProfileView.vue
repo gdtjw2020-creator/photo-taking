@@ -120,9 +120,9 @@ const openRedeemDialog = () => {
       <el-button type="primary" plain class="full-width" @click="openRedeemDialog">充值积分卡密</el-button>
       <div class="qr-recharge">
         <el-image 
-          src="/src/assets/单人二维码.png" 
+          src="/images/qr_wecom.png" 
           class="recharge-qr"
-          :preview-src-list="['/src/assets/单人二维码.png']"
+          :preview-src-list="['/images/qr_wecom.png']"
           fit="contain"
         ></el-image>
         <p class="recharge-tip">扫码添加企业微信<br>联系客服人工充值 / 获取激活码</p>

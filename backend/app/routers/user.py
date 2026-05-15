@@ -15,7 +15,8 @@ async def get_profile(user_id: str = Depends(get_user_id)):
         "username": profile.get("username", "女神用户"),
         "email": profile.get("email") or "",
         "avatar_url": profile.get("avatar_url"),
-        "credits": profile.get("credits", 0)
+        "credits": profile.get("credits", 0),
+        "is_admin": profile.get("is_admin", False)
     }
 
 @router.get("/credits")

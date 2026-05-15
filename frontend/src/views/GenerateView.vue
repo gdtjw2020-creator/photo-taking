@@ -1,7 +1,7 @@
 <script setup>
 import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { ElMessage, ElLoading, ElMessageBox } from 'element-plus'
-import { Loading, ZoomIn, Close, Plus, Download, Camera, Picture } from '@element-plus/icons-vue'
+import { Loading, ZoomIn, Close, Plus, Download, Camera, Picture, Edit } from '@element-plus/icons-vue'
 import api from '../api'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../store/auth'
@@ -20,6 +20,9 @@ const isLoadingStyles = ref(false)
 const selectedStyle = ref(null)
 const darkroomPackage = ref(3)
 const promptMode = ref('similar')
+const isAdmin = ref(false)
+const previewStyle = ref(null)
+const showPreview = ref(false)
 
 const pageTitle = computed(() => {
   const m = { classic_style: '时代艺术照', darkroom_random: '暗房盲盒', reference_shoot: '照着样子拍' }
@@ -80,6 +83,18 @@ onMounted(async () => {
 
     // 加载老照片风格
     await loadStyles()
+    
+    // 加载个人资料及管理员状态
+    if (isLoggedIn.value) {
+      try {
+        const profileRes = await api.get('/api/user/profile')
+        if (profileRes.data?.is_admin) {
+          isAdmin.value = true
+        }
+      } catch (err) {
+        console.warn('Failed to fetch profile for admin check')
+      }
+    }
     
     // 加载已存形象 (仅登录用户)
     if (isLoggedIn.value) {
@@ -445,6 +460,49 @@ const downloadAll = async () => {
   }
 }
 
+// 管理员功能：更新风格封面
+const styleCoverInput = ref(null)
+const targetStyleId = ref(null)
+const updatingStyleId = ref(null) // 用于局部加载状态
+
+const triggerAdminCoverUpload = (styleId) => {
+  targetStyleId.value = styleId
+  if (styleCoverInput.value) styleCoverInput.value.click()
+}
+
+const handleAdminCoverUpload = async (e) => {
+  const file = e.target.files[0]
+  if (!file || !targetStyleId.value) return
+  
+  updatingStyleId.value = targetStyleId.value
+  const formData = new FormData()
+  formData.append('file', file)
+  
+  try {
+    const res = await api.post(`/api/photoshoot/styles/${targetStyleId.value}/cover`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+    
+    // 更新本地显示
+    const style = oldPhotoStyles.value.find(s => s.id === targetStyleId.value)
+    if (style) {
+      style.preview_url = res.data.preview_url
+    }
+    ElMessage.success('风格封面更新成功')
+  } catch (err) {
+    console.error('Update cover error:', err)
+    ElMessage.error(err.response?.data?.detail || '更新失败')
+  } finally {
+    updatingStyleId.value = null
+    e.target.value = ''
+  }
+}
+
+const triggerPreview = (style) => {
+  previewStyle.value = style
+  showPreview.value = true
+}
+
 
 </script>
 
@@ -479,10 +537,24 @@ const downloadAll = async () => {
       <!-- ===== 时代艺术照 Step 1 ===== -->
       <div v-if="currentMode === 'classic_style'" class="step-card glass-card">
         <h2>1. 选择年代风格</h2>
-        <div class="old-style-grid" v-loading="isLoadingStyles" element-loading-background="rgba(0, 0, 0, 0.3)">
-          <div v-for="style in oldPhotoStyles" :key="style.id" class="old-style-item" :class="{ active: selectedStyle?.id === style.id }" @click="selectOldStyle(style)">
-            <div class="old-style-img-container">
-              <el-image v-if="style.preview_url" :src="style.preview_url" fit="cover" class="old-style-img" lazy>
+        
+        <!-- 第一阶段：加载风格文本资料 -->
+        <div v-if="isLoadingStyles && oldPhotoStyles.length === 0" class="styles-meta-loading">
+          <el-icon class="is-loading"><Loading /></el-icon>
+          <p>正在冲洗风格名录...</p>
+        </div>
+
+        <div v-else class="old-style-grid">
+          <div v-for="style in oldPhotoStyles" :key="style.id" class="old-style-item" 
+            :class="{ active: selectedStyle?.id === style.id }" 
+            @click="selectOldStyle(style)"
+          >
+            <div class="old-style-img-container"
+              v-loading="updatingStyleId === style.id"
+              element-loading-text="更新中..."
+              element-loading-background="rgba(0, 0, 0, 0.6)"
+            >
+              <el-image v-if="style.preview_url" :src="style.preview_url" fit="cover" class="old-style-img" lazy :preview-src-list="[style.preview_url]" preview-teleported hide-on-click-modal>
                 <template #placeholder>
                   <div class="old-style-placeholder"><el-icon class="is-loading"><Loading /></el-icon></div>
                 </template>
@@ -491,6 +563,16 @@ const downloadAll = async () => {
                 </template>
               </el-image>
               <div v-else class="old-style-placeholder"><span class="placeholder-era-icon">📷</span></div>
+              
+              <!-- 放大查看按钮 -->
+              <div v-if="style.preview_url" class="style-zoom-badge" @click.stop="triggerPreview(style)">
+                 <el-icon><ZoomIn /></el-icon>
+              </div>
+              
+              <!-- 管理员快捷编辑 -->
+              <div v-if="isAdmin" class="admin-edit-badge" @click.stop="triggerAdminCoverUpload(style.id)">
+                <el-icon><Edit /></el-icon> 换封面
+              </div>
             </div>
             <div class="old-style-info">
               <span class="old-style-name">{{ style.name }}</span>
@@ -498,6 +580,8 @@ const downloadAll = async () => {
             </div>
           </div>
         </div>
+        <!-- 隐藏的管理员文件输入 -->
+        <input type="file" ref="styleCoverInput" style="display: none" accept="image/*" @change="handleAdminCoverUpload">
       </div>
 
       <!-- ===== 暗房盲盒 Step 1 ===== -->
@@ -688,6 +772,23 @@ const downloadAll = async () => {
         <el-checkbox v-model="addWatermark" style="margin-left: 20px">添加"AI生成"水印</el-checkbox>
       </div>
     </template>
+
+    <!-- 全屏预览 -->
+    <div v-if="showPreview" class="full-screen-preview" @click="showPreview = false">
+      <div class="preview-content" @click.stop>
+        <img :src="previewStyle?.preview_url" class="preview-img" alt="预览图">
+        
+        <!-- 风格详情面板 -->
+        <div class="preview-info-panel glass-card">
+          <h3 class="preview-style-name">{{ previewStyle?.name }}</h3>
+          <p class="preview-style-desc">{{ previewStyle?.description }}</p>
+        </div>
+
+        <div class="preview-close" @click="showPreview = false">
+          <el-icon><Close /></el-icon>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -781,12 +882,13 @@ h2 { color: #f7c873; font-size: 1.1rem; margin-bottom: 16px; font-weight: 700; }
 /* 风格选择 */
 .old-style-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
 .old-style-item {
+  position: relative;
   border-radius: 12px; overflow: hidden; border: 2px solid transparent; cursor: pointer;
   transition: all 0.3s; background: rgba(255,255,255,0.05); padding-bottom: 10px;
 }
 .old-style-item.active { border-color: #f7c873; box-shadow: 0 0 16px rgba(247,200,115,0.3); background: rgba(247,200,115,0.08); }
 .old-style-item:hover { border-color: rgba(247,200,115,0.4); transform: translateY(-2px); }
-.old-style-img-container { width: 100%; aspect-ratio: 4/5; overflow: hidden; background: rgba(0,0,0,0.2); }
+.old-style-img-container { width: 100%; aspect-ratio: 4/5; overflow: hidden; background: rgba(0,0,0,0.2); position: relative; }
 .old-style-img { width: 100%; height: 100%; transition: transform 0.5s; }
 .old-style-item:hover .old-style-img { transform: scale(1.1); }
 .old-style-placeholder {
@@ -796,6 +898,22 @@ h2 { color: #f7c873; font-size: 1.1rem; margin-bottom: 16px; font-weight: 700; }
   filter: sepia(0.4) contrast(0.9);
   color: #f7c873;
 }
+
+.admin-edit-badge {
+  position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.7);
+  color: #f7c873; font-size: 0.7rem; padding: 4px 8px; border-radius: 20px;
+  display: flex; align-items: center; gap: 4px; backdrop-filter: blur(4px);
+  border: 1px solid rgba(247,200,115,0.3); transition: all 0.2s;
+}
+.admin-edit-badge:hover { background: #f7c873; color: #000; transform: scale(1.05); }
+
+.style-zoom-badge {
+  position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.5);
+  color: #fff; width: 28px; height: 28px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(4px); transition: all 0.2s; cursor: pointer;
+}
+.style-zoom-badge:hover { background: rgba(247,200,115,0.8); color: #000; }
 .placeholder-era-icon { font-size: 2.2rem; opacity: 0.6; }
 .old-style-info { padding: 8px 10px 4px; display: flex; flex-direction: column; gap: 3px; }
 .old-style-name { font-size: 0.95rem; font-weight: 600; color: #fff; }
@@ -958,6 +1076,41 @@ h2 { color: #f7c873; font-size: 1.1rem; margin-bottom: 16px; font-weight: 700; }
   .old-style-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
   .mvp-title { font-size: 1.05rem; }
   .mode-title { font-size: 1.5rem; }
+}
+
+/* 全屏预览 */
+.full-screen-preview {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.9); z-index: 3000;
+  display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(10px);
+}
+.preview-content { position: relative; max-width: 90%; max-height: 90%; }
+.preview-img { max-width: 100%; max-height: 90vh; border-radius: 8px; border: 2px solid rgba(247,200,115,0.3); box-shadow: 0 0 30px rgba(0,0,0,0.5); }
+.preview-close {
+  position: absolute; top: -40px; right: 0; color: #fff; font-size: 1.5rem;
+  cursor: pointer; background: rgba(255,255,255,0.1); width: 32px; height: 32px;
+  border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s;
+}
+.preview-close:hover { background: #f7c873; color: #000; transform: rotate(90deg); }
+
+/* 预览信息面板 */
+.preview-info-panel {
+  position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+  width: 90%; max-width: 400px; padding: 16px;
+  background: rgba(26, 22, 20, 0.85); border: 1px solid rgba(212, 167, 106, 0.3);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5); text-align: center;
+  animation: slideUp 0.3s ease-out;
+}
+.preview-style-name { margin: 0 0 6px; color: #f7c873; font-size: 1.1rem; font-weight: 700; }
+.preview-style-desc { margin: 0; color: rgba(255,255,255,0.8); font-size: 0.85rem; line-height: 1.5; }
+
+@keyframes slideUp { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+@media (max-width: 480px) {
+  .old-style-desc { white-space: normal; height: auto; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .old-style-item { height: auto; }
 }
 </style>
 
