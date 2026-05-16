@@ -526,7 +526,14 @@ async def process_photoshoot_task(task_id: str, user_id: str, input_url: Optiona
             for i, p in enumerate(prompts):
                 try:
                     ref_url = reference_urls[i] if reference_urls and i < len(reference_urls) else None
-                    print(f"[DEBUG] Generating image {i+1}/{len(prompts)} for task {task_id} (input_url={'present' if input_url else 'absent'})")
+                    print(f"--- [AI GENERATION START] ---")
+                    print(f"Task ID: {task_id}")
+                    print(f"Image Index: {i+1}/{len(prompts)}")
+                    print(f"Final Prompt: {p}")
+                    print(f"Input URL: {input_url}")
+                    print(f"Reference URL: {ref_url}")
+                    print(f"--- [AI GENERATION CALLING] ---")
+                    
                     results = await ai_service.generate_images(input_url, p, ref_url, size, quality)
                     
                     if results and len(results) > 0:
@@ -614,9 +621,18 @@ async def proxy_download(url: str):
     if not filename.endswith((".png", ".jpg", ".jpeg", ".webp")):
         filename = f"photoshoot_{uuid.uuid4().hex[:8]}.png"
 
+    # 根据文件扩展名确定媒体类型，帮助移动端更好地识别文件
+    content_type = "application/octet-stream"
+    if filename.lower().endswith(".png"):
+        content_type = "image/png"
+    elif filename.lower().endswith((".jpg", ".jpeg")):
+        content_type = "image/jpeg"
+    elif filename.lower().endswith(".webp"):
+        content_type = "image/webp"
+
     return StreamingResponse(
         stream_image(),
-        media_type="application/octet-stream",
+        media_type=content_type,
         headers={
             "Content-Disposition": f"attachment; filename={filename}",
             "Access-Control-Expose-Headers": "Content-Disposition"

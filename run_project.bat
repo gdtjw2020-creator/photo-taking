@@ -18,9 +18,11 @@ if not exist "%ROOT_DIR%venv\Scripts\activate.bat" (
         pause
         exit /b 1
     )
-    echo [Info] Installing dependencies...
-    call "%ROOT_DIR%venv\Scripts\activate.bat" && pip install -r "%ROOT_DIR%backend\requirements.txt"
 )
+
+:: Always update dependencies to ensure new packages are installed
+echo [Info] Checking/Updating dependencies...
+call "%ROOT_DIR%venv\Scripts\activate.bat" && pip install -r "%ROOT_DIR%backend\requirements.txt"
 
 :: 2. Start Backend
 echo [1/2] Starting Backend...

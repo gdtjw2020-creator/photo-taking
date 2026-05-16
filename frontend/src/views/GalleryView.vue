@@ -79,17 +79,31 @@ const handlePhotoDelete = async (photo) => {
 }
 
 const downloadImage = (url) => {
-  const proxyUrl = `/api/photoshoot/download?url=${encodeURIComponent(url)}`
-  const link = document.createElement('a')
-  link.href = proxyUrl
-  link.download = ''
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
+  // 核心修复：确保使用了完整的 API 基础路径，防止在非同域部署时失效
+  const baseUrl = (api.defaults.baseURL || '').replace(/\/$/, '')
+  const proxyUrl = `${baseUrl}/api/photoshoot/download?url=${encodeURIComponent(url)}`
+  
+  if (isMobile.value) {
+    // 移动端使用 window.location.href 触发下载，兼容性更好
+    window.location.href = proxyUrl
+  } else {
+    const link = document.createElement('a')
+    link.href = proxyUrl
+    link.download = ''
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
 }
 
 const downloadAll = async () => {
   if (myPhotos.value.length === 0) return
+  
+  if (isMobile.value) {
+    ElMessage.warning('移动端暂不支持批量下载，请点击图片右上角的按钮逐张保存')
+    return
+  }
+
   ElMessage.info('开始下载照片...')
   for (let i = 0; i < myPhotos.value.length; i++) {
     downloadImage(myPhotos.value[i].url)
@@ -201,6 +215,12 @@ onMounted(() => {
 .gallery-img {
   width: 100%;
   height: 100%;
+  cursor: pointer;
+  transition: transform 0.3s;
+}
+
+.gallery-img:hover {
+  transform: scale(1.02);
 }
 
 .image-slot {

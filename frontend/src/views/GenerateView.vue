@@ -458,23 +458,38 @@ const stopPolling = () => {
 
 const isMobile = ref(/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent))
 
-const downloadImage = (url, index) => {
+const downloadImage = (url) => {
   // 使用后端代理下载接口，解决跨域问题并强制触发下载
-  const proxyUrl = `/api/photoshoot/download?url=${encodeURIComponent(url)}`
-  const link = document.createElement('a')
-  link.href = proxyUrl
-  // 后端已设置 Content-Disposition，浏览器会识别为下载
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
+  // 核心修复：确保使用了完整的 API 基础路径，防止在非同域部署时失效
+  const baseUrl = (api.defaults.baseURL || '').replace(/\/$/, '')
+  const proxyUrl = `${baseUrl}/api/photoshoot/download?url=${encodeURIComponent(url)}`
+  
+  if (isMobile.value) {
+    // 移动端：直接跳转到下载链接
+    // 很多移动浏览器（如 iOS Safari）对 programmatic a.click() 限制较多
+    // window.location.href 在后端返回 Content-Disposition: attachment 时能更好地触发系统下载处理器
+    window.location.href = proxyUrl
+  } else {
+    const link = document.createElement('a')
+    link.href = proxyUrl
+    // 后端已设置 Content-Disposition，浏览器会识别为下载
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
 }
 
 const downloadAll = async () => {
   if (resultImages.value.length === 0) return
   
+  if (isMobile.value) {
+    ElMessage.warning('移动端暂不支持批量下载，请点击图片下方的按钮逐张保存')
+    return
+  }
+
   ElMessage.info('开始下载照片...')
   for (let i = 0; i < resultImages.value.length; i++) {
-    await downloadImage(resultImages.value[i], i)
+    downloadImage(resultImages.value[i])
     // 延迟防止浏览器拦截
     await new Promise(resolve => setTimeout(resolve, 800))
   }
@@ -797,7 +812,7 @@ const triggerPreview = (style) => {
         </h2>
         <div class="result-grid">
           <div v-for="(url, index) in resultImages" :key="url" class="result-item">
-            <el-image :src="url" :preview-src-list="isMobile ? [] : resultImages" :initial-index="index" fit="cover" preview-teleported></el-image>
+            <el-image :src="url" :preview-src-list="resultImages" :initial-index="index" fit="cover" preview-teleported></el-image>
             <div class="result-download-btn" @click.stop="downloadImage(url)"><el-icon><Download /></el-icon></div>
           </div>
           <div v-for="n in Math.max(0, expectedCount - resultImages.length)" :key="'loading-'+n" class="result-item loading-placeholder" v-if="taskStatus === 'processing'">
@@ -808,6 +823,7 @@ const triggerPreview = (style) => {
           <el-button type="success" @click="downloadAll">{{ isMobile ? '保存全部照片' : '下载全组照片' }}</el-button>
           <el-button @click="taskStatus = ''">再拍一套</el-button>
         </div>
+        <p class="result-hint">提示：点击图片可查看大图{{ isMobile ? '，长按可保存到相册' : '' }}</p>
       </div>
 
       <!-- ===== 法律声明 ===== -->
@@ -1069,6 +1085,15 @@ h2 { color: #f7c873; font-size: 1.1rem; margin-bottom: 16px; font-weight: 700; }
 .leave-hint { margin-bottom: 12px; }
 .result-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; margin-bottom: 16px; }
 .result-item { border-radius: 12px; overflow: hidden; height: 240px; position: relative; }
+.result-item :deep(.el-image) {
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+  transition: transform 0.3s;
+}
+.result-item :deep(.el-image):hover {
+  transform: scale(1.02);
+}
 .result-download-btn {
   position: absolute; bottom: 8px; right: 8px; width: 32px; height: 32px;
   background: rgba(0,0,0,0.6); border-radius: 50%; display: flex; align-items: center;
@@ -1084,6 +1109,17 @@ h2 { color: #f7c873; font-size: 1.1rem; margin-bottom: 16px; font-weight: 700; }
 }
 .loading-content { display: flex; flex-direction: column; align-items: center; gap: 10px; color: var(--text-muted); }
 .loading-content i { font-size: 2rem; }
+.result-hint {
+  margin-top: 12px;
+  font-size: 0.8rem;
+  color: #f7c873;
+  text-align: center;
+  background: rgba(247, 200, 115, 0.1);
+  padding: 8px;
+  border-radius: 8px;
+  opacity: 0.9;
+}
+
 .mobile-hint { margin-top: 12px; font-size: 0.8rem; color: var(--primary-color); text-align: center; }
 
 /* 参考图 */
