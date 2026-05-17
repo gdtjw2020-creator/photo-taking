@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 :: Strictly ASCII to avoid encoding issues on Chinese Windows
 setlocal enabledelayedexpansion
 
@@ -22,11 +22,11 @@ if not exist "%ROOT_DIR%venv\Scripts\activate.bat" (
 
 :: Always update dependencies to ensure new packages are installed
 echo [Info] Checking/Updating dependencies...
-call "%ROOT_DIR%venv\Scripts\activate.bat" && pip install -r "%ROOT_DIR%backend\requirements.txt"
+call "%ROOT_DIR%venv\Scripts\activate.bat" && python -m pip install -r "%ROOT_DIR%backend\requirements.txt"
 
 :: 2. Start Backend
 echo [1/2] Starting Backend...
-start "Goddess-Backend" /d "%ROOT_DIR%backend" cmd /k "call ..\venv\Scripts\activate.bat && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+start "Goddess-Backend" /d "%ROOT_DIR%backend" cmd /k "call ..\venv\Scripts\activate.bat && python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
 
 :: 3. Start Frontend
 echo [2/2] Starting Frontend...

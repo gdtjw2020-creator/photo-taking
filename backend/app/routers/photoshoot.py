@@ -107,8 +107,6 @@ def _build_reference_prompt(prompt_mode: Optional[str]) -> str:
         ),
     }
     return f"{base} {mode_rules[mode]} Photorealistic, cinematic quality, natural skin texture, 4K."
-
-
 def _select_mvp_prompts(request: PhotoshootRequest) -> Optional[Dict[str, Any]]:
     """Return prompt selection data for MVP modes, or None for legacy flow."""
     module_type = request.module_type
@@ -148,7 +146,8 @@ def _select_mvp_prompts(request: PhotoshootRequest) -> Optional[Dict[str, Any]]:
                 "module_name": "时代艺术照",
                 "style_ids": [style["id"]],
                 "style_names": [style["name"]],
-                "framing": final_framing
+                "framing": final_framing,
+                "selected_prompts": selected_prompts
             },
         }
 
@@ -176,6 +175,7 @@ def _select_mvp_prompts(request: PhotoshootRequest) -> Optional[Dict[str, Any]]:
                 "actual_count": count,
                 "style_ids": [style["id"] for style in selected_styles],
                 "style_names": [style["name"] for style in selected_styles],
+                "selected_prompts": selected_prompts
             },
         }
 
@@ -200,6 +200,7 @@ def _select_mvp_prompts(request: PhotoshootRequest) -> Optional[Dict[str, Any]]:
                 "module_name": "照着样子拍",
                 "prompt_mode": mode,
                 "reference_count": len(refs),
+                "selected_prompts": [prompt] * len(refs)
             },
         }
 
@@ -346,23 +347,7 @@ async def generate_photoshoot(
             detail=f"余额不足。本次约拍预计消耗 {required_credits} 积分，您当前剩余 {current_credits} 积分。请点击个人中心充值。"
         )
 
-    task_id = str(uuid.uuid4())
-    
-    # 3. 创建数据库记录
-    success = supabase_service.create_task(
-        task_id=task_id,
-        user_id=user_id,
-        template_id=request.template_id if request.template_id and len(request.template_id) > 10 else None,
-        input_url=request.image_url, # 此时可以是 None
-        module_type=request.module_type,
-        style_id=selected_style_id,
-        metadata=task_metadata
-    )
-    
-    if not success:
-        print(f"Warning: Failed to create task record for {task_id}")
-
-    # 4. 旧逻辑：确定 Prompts 或 Reference URLs
+    # 4. 确定 Prompts 或 Reference URLs (调整至创建记录前，用于记录提示词到 task_metadata)
     if selected_prompts:
         pass
     elif request.reference_image_urls:
@@ -380,6 +365,25 @@ async def generate_photoshoot(
 
         count = min(max(request.image_count, 1), len(base_prompts))
         selected_prompts = random.sample(base_prompts, count)
+
+    # 将最终生成的提示词保存到任务元数据中，便于前端/调试排查
+    task_metadata["selected_prompts"] = selected_prompts
+
+    task_id = str(uuid.uuid4())
+    
+    # 3. 创建数据库记录
+    success = supabase_service.create_task(
+        task_id=task_id,
+        user_id=user_id,
+        template_id=request.template_id if request.template_id and len(request.template_id) > 10 else None,
+        input_url=request.image_url, # 此时可以是 None
+        module_type=request.module_type,
+        style_id=selected_style_id,
+        metadata=task_metadata
+    )
+    
+    if not success:
+        print(f"Warning: Failed to create task record for {task_id}")
     
     # 异步执行生成逻辑
     background_tasks.add_task(

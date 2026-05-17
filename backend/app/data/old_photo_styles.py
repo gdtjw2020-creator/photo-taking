@@ -37,14 +37,14 @@ OLD_PHOTO_STYLES: List[Dict[str, object]] = [
         "prompts": [
             _prompt(
                 "1950s Chinese worker-soldier studio portrait, black and white, "
-                "plain cotton work jacket, upright half-body pose, simple cloth "
+                "plain cotton work jacket, simple cloth "
                 "backdrop, steady unwavering gaze fixed on the horizon, firm and "
                 "hopeful expression reflecting industrial pride, archival photo "
                 "texture, slightly faded paper print"
             ),
             _prompt(
                 "old Chinese state-owned photo studio portrait, monochrome film, "
-                "buttoned workwear, direct frontal composition, soft overhead "
+                "buttoned workwear, soft overhead "
                 "light, calm eyes with a look of simple honesty and duty, solemn "
                 "but warm micro-expression, subtle scratches and aged silver "
                 "gelatin print feeling"
@@ -87,15 +87,15 @@ OLD_PHOTO_STYLES: List[Dict[str, object]] = [
         "prompts": [
             _prompt(
                 "1930s old Shanghai elegant qipao portrait, refined silk qipao, "
-                "soft diffused studio lighting, side-facing three-quarter pose, "
+                "soft diffused studio lighting, side-facing pose, "
                 "painted studio backdrop, demure half-smile, eyes with a hint of "
                 "melancholic grace and sophisticated depth, graceful expression, "
                 "subtle sepia color, authentic Republican-era photo studio style"
             ),
             _prompt(
                 "vintage Shanghai socialite photo, tailored qipao, delicate hair "
-                "waves, pearl earrings, warm softbox lighting, seated portrait "
-                "composition, old studio backdrop, sophisticated sideways look, "
+                "waves, pearl earrings, warm softbox lighting, old studio backdrop, "
+                "sophisticated sideways look, "
                 "elegant nostalgic gaze reflecting the golden era, faded color "
                 "film, refined and realistic"
             ),
@@ -120,7 +120,7 @@ OLD_PHOTO_STYLES: List[Dict[str, object]] = [
             _prompt(
                 "old Chinese campus studio portrait, clean student uniform, "
                 "earnest and intelligent gaze, reserved but sincere smile, eyes "
-                "reflecting youthful ideals, upright half-body composition, "
+                "reflecting youthful ideals, "
                 "muted colors, gentle film grain, documentary realism"
             ),
         ],
@@ -193,7 +193,7 @@ OLD_PHOTO_STYLES: List[Dict[str, object]] = [
             _prompt(
                 "classic 1990s Chinese portrait studio photo, dreamy soft light, "
                 "subtle vignette, decorative fabric prop, soft nostalgic gaze, "
-                "elegant half-body composition, eyes reflecting the softbox "
+                "eyes reflecting the softbox "
                 "umbrella lights, slightly overexposed film print, authentic "
                 "period styling"
             ),
@@ -209,8 +209,8 @@ OLD_PHOTO_STYLES: List[Dict[str, object]] = [
         "default_framing": "portrait",
         "prompts": [
             _prompt(
-                "old Beijing traditional photo studio portrait, formal seated "
-                "pose, long gown or elegant qipao styling as appropriate, carved "
+                "old Beijing traditional photo studio portrait, "
+                "long gown or elegant qipao styling as appropriate, carved "
                 "wood chair, plain studio curtain, unblinking formal look, calm "
                 "and dignified gaze, wise steady eyes, sepia toned paper print, "
                 "realistic early studio photography"
@@ -243,8 +243,8 @@ OLD_PHOTO_STYLES: List[Dict[str, object]] = [
                 "vintage Chinese sent-down youth commemorative photo, simple "
                 "cotton work shirt, rolled-up sleeves, wheat field or terraced "
                 "hillside background, eyes reflecting the vastness of the "
-                "countryside, resilient youthful expression, half-body "
-                "composition, candid natural pose, realistic 1970s color film grain"
+                "countryside, resilient youthful expression, "
+                "candid natural pose, realistic 1970s color film grain"
             ),
         ],
     },
