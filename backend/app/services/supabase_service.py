@@ -389,6 +389,20 @@ class SupabaseService:
             print(f"Error saving feedback: {e}")
             return False
 
+    def get_all_feedbacks(self):
+        """获取所有用户反馈 (仅管理员使用)"""
+        if not self.supabase:
+            return []
+        try:
+            res = self.supabase.table("feedback")\
+                .select("*")\
+                .order("created_at", desc=True)\
+                .execute()
+            return res.data
+        except Exception as e:
+            print(f"Error fetching feedbacks: {e}")
+            return []
+
     def get_style_overrides(self) -> dict:
         """从数据库获取风格覆盖配置 (如封面图)"""
         if not self.supabase:

@@ -572,6 +572,29 @@ const triggerPreview = (style) => {
   showPreview.value = true
 }
 
+const openFeedbackDialog = () => {
+  if (!checkAuth('请登录后再提交风格建议，以便唐师傅给您答复')) return
+  
+  ElMessageBox.prompt('告诉唐师傅您期待的年代背景、人像服装或特定摄影风格：', '建议新风格', {
+    confirmButtonText: '提交建议',
+    cancelButtonText: '我再想想',
+    inputPattern: /\S+/,
+    inputErrorMessage: '输入内容不能为空',
+    inputType: 'textarea',
+    inputPlaceholder: '例：希望出一套唐装汉服风格 / 80年代校园怀旧风...',
+    customClass: 'feedback-prompt-box'
+  }).then(async ({ value }) => {
+    try {
+      await api.post('/api/user/feedback', {
+        content: value,
+        type: 'style_request'
+      })
+      ElMessage.success('收到您的风格建议！唐师傅马上着手开发！')
+    } catch (err) {
+      ElMessage.error(err.response?.data?.detail || '提交失败，请重试')
+    }
+  }).catch(() => {})
+}
 
 </script>
 
@@ -643,9 +666,22 @@ const triggerPreview = (style) => {
                 <el-icon><Edit /></el-icon> 换封面
               </div>
             </div>
+             <div class="old-style-info">
+               <span class="old-style-name">{{ style.name }}</span>
+               <span class="old-style-desc" :title="style.description">{{ style.description }}</span>
+             </div>
+           </div>
+          
+          <!-- 用户建议/反馈风格专属卡片 -->
+          <div class="old-style-item feedback-style-card" @click="openFeedbackDialog">
+            <div class="old-style-img-container">
+              <div class="old-style-placeholder feedback-placeholder">
+                <span class="placeholder-era-icon">✨</span>
+              </div>
+            </div>
             <div class="old-style-info">
-              <span class="old-style-name">{{ style.name }}</span>
-              <span class="old-style-desc" :title="style.description">{{ style.description }}</span>
+              <span class="old-style-name">想要其他风格？</span>
+              <span class="old-style-desc">告诉唐师傅您期待的风格，我们将全力为您开发上线！</span>
             </div>
           </div>
         </div>
@@ -1536,6 +1572,29 @@ h2 { color: #f7c873; font-size: 1.1rem; margin-bottom: 16px; font-weight: 700; }
     align-items: flex-start;
     text-align: left;
   }
+}
+
+/* 自定义反馈风格卡片样式 */
+.feedback-style-card {
+  border: 2px dashed rgba(247, 200, 115, 0.3) !important;
+  background: rgba(247, 200, 115, 0.02) !important;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.feedback-style-card:hover {
+  border-color: #f7c873 !important;
+  box-shadow: 0 0 15px rgba(247, 200, 115, 0.15) !important;
+  background: rgba(247, 200, 115, 0.06) !important;
+  transform: translateY(-4px);
+}
+
+.feedback-placeholder {
+  background: linear-gradient(135deg, rgba(247, 200, 115, 0.12), rgba(155, 215, 203, 0.12)) !important;
+  color: #f7c873 !important;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 </style>
 

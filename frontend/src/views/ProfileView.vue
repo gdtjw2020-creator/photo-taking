@@ -17,8 +17,21 @@ const user = ref({
   avatar: 'https://placehold.co/100x100/png?text=Avatar'
 })
 
-// 移除 myPhotos 引用
-// const myPhotos = ref([])
+const isAdmin = ref(false)
+const feedbacks = ref([])
+const isLoadingFeedbacks = ref(false)
+
+const loadFeedbacks = async () => {
+  isLoadingFeedbacks.value = true
+  try {
+    const res = await api.get('/api/user/feedbacks')
+    feedbacks.value = res.data
+  } catch (err) {
+    console.error('Failed to load feedbacks:', err)
+  } finally {
+    isLoadingFeedbacks.value = false
+  }
+}
 
 onMounted(async () => {
   if (!isLoggedIn.value) return
@@ -26,11 +39,16 @@ onMounted(async () => {
   try {
     // 获取个人资料
     const profileRes = await api.get('/api/user/profile')
+    isAdmin.value = profileRes.data.is_admin || false
     user.value = {
       username: profileRes.data.username || authStore.user?.email?.split('@')[0] || '雅致宾客',
       email: profileRes.data.email || authStore.user?.email || '未绑定邮箱',
       credits: profileRes.data.credits,
       avatar: profileRes.data.avatar_url || user.value.avatar
+    }
+
+    if (isAdmin.value) {
+      loadFeedbacks()
     }
 
     // 获取积分明细
@@ -141,6 +159,23 @@ const openRedeemDialog = () => {
         </div>
       </div>
       <el-empty v-if="creditLogs.length === 0" description="暂无变动明细" :image-size="60"></el-empty>
+    </div>
+
+    <!-- 管理员后台：查看用户反馈的风格 -->
+    <div v-if="isLoggedIn && isAdmin" class="admin-feedback-section animate__animated animate__fadeIn">
+      <div class="section-title">📬 用户建议的风格 (仅管理员可见)</div>
+      <div class="feedbacks-list glass-card" v-loading="isLoadingFeedbacks" element-loading-background="rgba(0, 0, 0, 0.4)">
+        <div v-for="fb in feedbacks" :key="fb.id" class="feedback-item">
+          <div class="feedback-main">
+            <div class="feedback-content">{{ fb.content }}</div>
+            <div class="feedback-meta">
+              <span class="feedback-tag">类型: {{ fb.type === 'style_request' ? '定制风格' : fb.type }}</span>
+              <span class="feedback-time">{{ new Date(fb.created_at).toLocaleString('zh-CN', {month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'}) }}</span>
+            </div>
+          </div>
+        </div>
+        <el-empty v-if="feedbacks.length === 0" description="暂无用户反馈" :image-size="60"></el-empty>
+      </div>
     </div>
 
     <!-- 兑换卡密弹窗 -->
@@ -327,5 +362,58 @@ const openRedeemDialog = () => {
 
 .guest-tip {
   margin-top: 40px;
+}
+
+.admin-feedback-section {
+  margin-top: 32px;
+  margin-bottom: 24px;
+}
+
+.feedbacks-list {
+  padding: 8px 16px;
+  margin-bottom: 24px;
+}
+
+.feedback-item {
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.feedback-item:last-child {
+  border-bottom: none;
+}
+
+.feedback-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.feedback-content {
+  font-size: 0.95rem;
+  color: #fff;
+  line-height: 1.5;
+  word-break: break-all;
+}
+
+.feedback-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  opacity: 0.8;
+}
+
+.feedback-tag {
+  background: rgba(247, 200, 115, 0.15);
+  color: #f7c873;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.feedback-time {
+  color: var(--text-muted);
 }
 </style>

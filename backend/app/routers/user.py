@@ -53,3 +53,13 @@ async def post_feedback(request: FeedbackRequest, user_id: str = Depends(get_use
     if not success:
         raise HTTPException(status_code=500, detail="提交失败")
     return {"status": "success", "message": "反馈已收到，感谢您的建议！"}
+
+@router.get("/feedbacks")
+async def get_feedbacks(user_id: str = Depends(get_user_id)):
+    """获取所有用户反馈 (限制管理员权限)"""
+    profile = supabase_service.get_user_profile(user_id)
+    if not profile.get("is_admin", False):
+        raise HTTPException(status_code=403, detail="没有管理员权限")
+    
+    feedbacks = supabase_service.get_all_feedbacks()
+    return feedbacks
