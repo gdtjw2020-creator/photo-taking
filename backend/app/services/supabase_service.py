@@ -145,28 +145,58 @@ class SupabaseService:
             return []
 
     def get_latest_active_task(self, user_id: str):
-        """获取用户最新的一条活跃任务 (pending/processing)"""
+        """获取用户最新的一条活跃任务 (pending/processing)，并自动熔断过期的僵尸任务"""
         # 1. 检查本地内存缓存
         active_in_cache = [t for t in _local_task_cache.values() if t.get("user_id") == user_id and t.get("status") in ("pending", "processing")]
+        
+        task = None
         if active_in_cache:
-            # 返回最新创建的
-            return active_in_cache[-1]
+            task = active_in_cache[-1]
+        elif self.supabase:
+            try:
+                res = self.supabase.table("photoshoot_tasks")\
+                    .select("*")\
+                    .eq("user_id", user_id)\
+                    .in_("status", ["pending", "processing"])\
+                    .order("created_at", desc=True)\
+                    .limit(1)\
+                    .execute()
+                if res.data:
+                    task = res.data[0]
+            except Exception as e:
+                print(f"[ERROR] Error fetching active task: {e}")
 
-        if not self.supabase:
-            return None
-            
-        try:
-            res = self.supabase.table("photoshoot_tasks")\
-                .select("*")\
-                .eq("user_id", user_id)\
-                .in_("status", ["pending", "processing"])\
-                .order("created_at", desc=True)\
-                .limit(1)\
-                .execute()
-            return res.data[0] if res.data else None
-        except Exception as e:
-            print(f"[ERROR] Error fetching active task: {e}")
-            return None
+        # 2. 自动熔断僵尸任务
+        if task and task.get("status") in ("pending", "processing") and "created_at" in task:
+            try:
+                created_at_str = task["created_at"]
+                if created_at_str != "now":
+                    # 处理带Z或偏移量的 ISO 字符串
+                    created_time = datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
+                    now = datetime.now(timezone.utc)
+                    elapsed_seconds = (now - created_time).total_seconds()
+                    
+                    # 获取提示词数量（用来计算动态超时时间，默认最少 1 张，每张最长 7 分钟）
+                    metadata = task.get("metadata") or {}
+                    if isinstance(metadata, str):
+                        import json
+                        try:
+                            metadata = json.loads(metadata)
+                        except:
+                            metadata = {}
+                    prompts_count = len(metadata.get("selected_prompts", [])) or 1
+                    dynamic_timeout = prompts_count * 7 * 60
+                    
+                    if elapsed_seconds > dynamic_timeout:
+                        print(f"[DEBUG] Found zombie active task {task['id']}, elapsed {elapsed_seconds}s > {dynamic_timeout}s. Marking failed.")
+                        self.update_task_status(task["id"], "failed", error_message=f"生成任务严重超时超过 {prompts_count * 7} 分钟限制，已被系统安全熔断")
+                        # 更新内存状态，防止当前请求继续返回该任务为活跃
+                        task["status"] = "failed"
+                        return None
+            except Exception as e:
+                print(f"检测僵尸活跃任务失败: {e}")
+
+        return task if task and task.get("status") in ("pending", "processing") else None
 
     def delete_user_face(self, user_id: str, face_id: str):
         """删除一个形象档案"""

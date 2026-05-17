@@ -133,14 +133,24 @@ onMounted(async () => {
       const activeRes = await api.get('/api/photoshoot/active_task')
       if (activeRes.data) {
           const task = activeRes.data
-          console.log('[DEBUG] Found active task, resuming polling:', task.id)
+          let imgCount = 1
+          if (task.metadata) {
+              let meta = task.metadata
+              if (typeof meta === 'string') {
+                  try { meta = JSON.parse(meta) } catch (e) {}
+              }
+              if (meta.selected_prompts) {
+                  imgCount = meta.selected_prompts.length || 1
+              }
+          }
+          console.log('[DEBUG] Found active task, resuming polling:', task.id, 'with image count:', imgCount)
           taskId.value = task.id
           taskStatus.value = task.status
           resultImages.value = task.output_urls || []
           const startTime = task.created_at ? new Date(task.created_at).getTime() : null
           // 如果有正在进行的任务，自动切换到结果视图
           isGenerating.value = true
-          startPolling(task.id, startTime)
+          startPolling(task.id, startTime, imgCount)
       }
     }
     // 处理从“形象存档”跳转过来的情况
@@ -383,7 +393,17 @@ const submitTask = async () => {
     resultImages.value = [] // 立即重置旧图片，显示新占位符
     errorMessage.value = '' // 重置错误信息
     ElMessage.success('任务已提交，唐师傅正在准备...')
-    startPolling(res.data.task_id)
+
+    let imgCount = 1
+    if (currentMode.value === 'classic_style') {
+      imgCount = selectedCount.value
+    } else if (currentMode.value === 'darkroom_random') {
+      imgCount = darkroomPackage.value
+    } else if (currentMode.value === 'reference_shoot') {
+      imgCount = referenceImages.value.length || 1
+    }
+
+    startPolling(res.data.task_id, null, imgCount)
   } catch (err) {
     const msg = err.response?.data?.detail || '开启任务失败，请稍后重试'
     ElMessage.error(msg)
@@ -421,14 +441,18 @@ const loadingText = computed(() => {
 
 const isLongWait = computed(() => elapsedSeconds.value > 300) // 超过 5 分钟提示离开
 
-const startPolling = (tid, existingStartTime = null) => {
+const startPolling = (tid, existingStartTime = null, imgCount = 1) => {
   taskStatus.value = 'processing'
   taskStartTime.value = existingStartTime || Date.now()
   elapsedSeconds.value = Math.floor((Date.now() - taskStartTime.value) / 1000)
 
+  const promptsCount = imgCount || 1
+  const dynamicMaxSeconds = promptsCount * 7 * 60 // 每张图片最长 7 分钟
+  const dynamicMaxMins = promptsCount * 7
+
   // 如果恢复的任务已经超过最大等待时间，直接标记失败不再轮询
-  if (elapsedSeconds.value >= MAX_WAIT_SECONDS) {
-    errorMessage.value = `任务已提交超过 ${MAX_WAIT_SECONDS} 秒（15 分钟），已自动超时。请到相册查看是否有已生成的结果，或重新提交。`
+  if (elapsedSeconds.value >= dynamicMaxSeconds) {
+    errorMessage.value = `任务已提交超过 ${dynamicMaxMins} 分钟，已自动超时。请到相册查看是否有已生成的结果，或重新提交。`
     taskStatus.value = 'failed'
     isGenerating.value = false
     return
@@ -438,8 +462,8 @@ const startPolling = (tid, existingStartTime = null) => {
     try {
       elapsedSeconds.value = Math.floor((Date.now() - taskStartTime.value) / 1000)
 
-      if (elapsedSeconds.value >= MAX_WAIT_SECONDS) {
-        errorMessage.value = `已等待超过 ${MAX_WAIT_SECONDS} 秒（15 分钟），任务可能已超时。请稍后到相册查看结果。`
+      if (elapsedSeconds.value >= dynamicMaxSeconds) {
+        errorMessage.value = `已等待超过 ${dynamicMaxMins} 分钟，任务可能已超时。请稍后到相册查看结果。`
         ElMessage.warning(errorMessage.value)
         stopPolling()
         taskStatus.value = 'failed'

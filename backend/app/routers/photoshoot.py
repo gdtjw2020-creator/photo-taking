@@ -505,12 +505,23 @@ async def get_task_status(task_id: str):
             created_time = datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
             now = datetime.now(timezone.utc)
             elapsed_seconds = (now - created_time).total_seconds()
+            # 获取提示词数量（计算动态超时时间，默认最少 1 张，每张最长 7 分钟）
+            metadata = task.get("metadata") or {}
+            if isinstance(metadata, str):
+                import json
+                try:
+                    metadata = json.loads(metadata)
+                except:
+                    metadata = {}
+            prompts_count = len(metadata.get("selected_prompts", [])) or 1
+            dynamic_timeout = prompts_count * 7 * 60
             
-            # 如果超过 900 秒 (15分钟) 仍然在 processing，判定为底层卡死，强制干掉
-            if elapsed_seconds > 900:
-                supabase_service.update_task_status(task_id, "failed", error_message="生成任务在底层卡死或严重超时，已被系统安全熔断")
+            # 如果超过动态超时秒数仍然在 processing，判定为底层卡死，强制干掉
+            if elapsed_seconds > dynamic_timeout:
+                msg = f"生成任务严重超时超过 {prompts_count * 7} 分钟限制，已被系统安全熔断"
+                supabase_service.update_task_status(task_id, "failed", error_message=msg)
                 task["status"] = "failed"
-                task["error_message"] = "生成任务在底层卡死或严重超时，已被系统安全熔断"
+                task["error_message"] = msg
         except Exception as e:
             print(f"解析时间检测僵尸任务失败: {e}, 原始时间字符串: {task.get('created_at')}")
             
@@ -589,11 +600,12 @@ async def process_photoshoot_task(task_id: str, user_id: str, input_url: Optiona
                     last_error_msg = str(e)
                     continue
         
-        await asyncio.wait_for(run_prompts(), timeout=900)
+        dynamic_timeout = len(prompts) * 7 * 60  # 每张图片最长 7 分钟
+        await asyncio.wait_for(run_prompts(), timeout=dynamic_timeout)
 
     except asyncio.TimeoutError:
-        print(f"[TIMEOUT] Task {task_id} exceeded 900s limit.")
-        supabase_service.update_task_status(task_id, "failed", error_message="生成任务超时 (900s)")
+        print(f"[TIMEOUT] Task {task_id} exceeded {len(prompts) * 7} minutes limit.")
+        supabase_service.update_task_status(task_id, "failed", error_message=f"生成任务超时超过 {len(prompts) * 7} 分钟限制，已被系统安全中止")
         return
     except Exception as e:
         print(f"[ERROR] Task {task_id} process failed: {e}")
