@@ -157,11 +157,11 @@ def _select_mvp_prompts(request: PhotoshootRequest) -> Optional[Dict[str, Any]]:
         count = min(requested_count, len(styles))
         selected_styles = random.sample(styles, count)
         
-        # 盲盒模式：每张图使用各自风格的默认景别
+        # 盲盒模式：如果用户指定了统一的景别，则使用指定的景别；否则使用各自风格的默认景别
         selected_prompts = []
         for style in selected_styles:
             raw_p = random.choice(style["prompts"])
-            final_framing = style.get("default_framing")
+            final_framing = request.framing if request.framing in FRAMING_KEYWORDS else style.get("default_framing")
             prefix = f"{FRAMING_KEYWORDS[final_framing]}, " if final_framing in FRAMING_KEYWORDS else ""
             selected_prompts.append(f"{prefix}{raw_p}")
 
@@ -173,6 +173,7 @@ def _select_mvp_prompts(request: PhotoshootRequest) -> Optional[Dict[str, Any]]:
                 "module_name": "暗房盲盒",
                 "requested_count": requested_count,
                 "actual_count": count,
+                "framing": request.framing if request.framing in FRAMING_KEYWORDS else "default_random",
                 "style_ids": [style["id"] for style in selected_styles],
                 "style_names": [style["name"] for style in selected_styles],
                 "selected_prompts": selected_prompts

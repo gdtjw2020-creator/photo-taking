@@ -34,6 +34,14 @@ const framingOptions = [
 ]
 const selectedFraming = ref(null)
 
+// 照片比例选项与响应式状态 (9:16, 3:4, 1:1)
+const sizeOptions = [
+  { label: '9:16 竖屏', value: '1440x2560', desc: '适合手机壁纸、海报' },
+  { label: '3:4 相片', value: '1728x2304', desc: '经典复古冲印比例' },
+  { label: '1:1 方形', value: '2048x2048', desc: '社交头像、方形画幅' }
+]
+const selectedSize = ref('1440x2560')
+
 const pageTitle = computed(() => {
   const m = { classic_style: '时代艺术照', darkroom_random: '暗房盲盒', reference_shoot: '照着样子拍' }
   return m[currentMode.value] || 'AI 写真'
@@ -78,9 +86,19 @@ const loadStyles = async () => {
   }
 }
 
-// 监听模式变化，确保在切换到相关模式时加载风格
-watch(() => currentMode.value, () => {
+// 监听模式变化，确保在切换到相关模式时加载风格，并进行初始化重置
+watch(() => currentMode.value, (newMode) => {
   loadStyles()
+  if (newMode === 'darkroom_random') {
+    selectedFraming.value = 'default'
+    selectedSize.value = '1440x2560'
+  } else if (newMode === 'classic_style') {
+    selectedFraming.value = null
+    selectedSize.value = '1440x2560'
+  } else {
+    selectedFraming.value = null
+    selectedSize.value = '1440x2560'
+  }
 })
 
 onMounted(async () => {
@@ -337,10 +355,26 @@ const submitTask = async () => {
         image_url: uploadedImageUrl.value, 
         image_count: selectedCount.value, 
         watermark: addWatermark.value,
-        framing: selectedFraming.value // 传递景别参数
+        framing: selectedFraming.value, // 传递景别参数
+        size: selectedSize.value // 传递尺寸参数
       },
-      darkroom_random: { module_type: 'darkroom_random', image_url: uploadedImageUrl.value, image_count: darkroomPackage.value, watermark: addWatermark.value },
-      reference_shoot: { module_type: 'reference_shoot', prompt_mode: promptMode.value, image_url: uploadedImageUrl.value, reference_image_urls: referenceImages.value, image_count: referenceImages.value.length || 1, watermark: addWatermark.value }
+      darkroom_random: { 
+        module_type: 'darkroom_random', 
+        image_url: uploadedImageUrl.value, 
+        image_count: darkroomPackage.value, 
+        watermark: addWatermark.value,
+        framing: selectedFraming.value === 'default' ? null : selectedFraming.value, // 传递暗房盲盒景别参数
+        size: selectedSize.value // 传递暗房盲盒尺寸参数
+      },
+      reference_shoot: { 
+        module_type: 'reference_shoot', 
+        prompt_mode: promptMode.value, 
+        image_url: uploadedImageUrl.value, 
+        reference_image_urls: referenceImages.value, 
+        image_count: referenceImages.value.length || 1, 
+        watermark: addWatermark.value,
+        size: 'auto' // 照着样子拍，尺寸固定为 auto 匹配参考图
+      }
     }
     const payload = payloads[currentMode.value] || payloads.classic_style
 
@@ -641,6 +675,31 @@ const triggerPreview = (style) => {
             </div>
           </div>
         </div>
+
+        <!-- 比例选择 (仅在选好风格后显示) -->
+        <div v-if="selectedStyle" class="aspect-ratio-section animate__animated animate__fadeIn">
+          <div class="section-divider"></div>
+          <h3>3. 选择照片比例</h3>
+          <p class="section-subtitle">选择您期望的输出照片比例（均采用超清 2K 分辨率）</p>
+          <div class="aspect-ratio-grid">
+            <div v-for="opt in sizeOptions" :key="opt.value" 
+              class="aspect-ratio-item" 
+              :class="{ active: selectedSize === opt.value }"
+              @click="selectedSize = opt.value"
+            >
+              <div class="aspect-ratio-preview" :class="opt.value === '1440x2560' ? 'portrait' : opt.value === '1728x2304' ? 'photo' : 'square'">
+                <div class="aspect-ratio-box"></div>
+              </div>
+              <div class="aspect-ratio-meta">
+                <span class="aspect-ratio-label">{{ opt.label }}</span>
+                <span class="aspect-ratio-desc">{{ opt.desc }}</span>
+              </div>
+              <div class="active-check" v-if="selectedSize === opt.value">
+                <el-icon><Check /></el-icon>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- ===== 暗房盲盒 Step 1 ===== -->
@@ -661,6 +720,69 @@ const triggerPreview = (style) => {
           </div>
         </div>
         <p class="count-hint">唐师傅随机挑选年代风格，为您冲洗 {{ darkroomPackage }} 张惊喜老照片</p>
+
+        <!-- 暗房盲盒比例选择 -->
+        <div class="aspect-ratio-section animate__animated animate__fadeIn">
+          <div class="section-divider"></div>
+          <h3>2. 选择照片比例</h3>
+          <p class="section-subtitle">选择您期望的输出照片比例，默认 9:16（采用超清 2K 分辨率）</p>
+          <div class="aspect-ratio-grid">
+            <div v-for="opt in sizeOptions" :key="opt.value" 
+              class="aspect-ratio-item" 
+              :class="{ active: selectedSize === opt.value }"
+              @click="selectedSize = opt.value"
+            >
+              <div class="aspect-ratio-preview" :class="opt.value === '1440x2560' ? 'portrait' : opt.value === '1728x2304' ? 'photo' : 'square'">
+                <div class="aspect-ratio-box"></div>
+              </div>
+              <div class="aspect-ratio-meta">
+                <span class="aspect-ratio-label">{{ opt.label }}</span>
+                <span class="aspect-ratio-desc">{{ opt.desc }}</span>
+              </div>
+              <div class="active-check" v-if="selectedSize === opt.value">
+                <el-icon><Check /></el-icon>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 暗房盲盒景别选择 -->
+        <div class="framing-section animate__animated animate__fadeIn">
+          <div class="section-divider"></div>
+          <h3>3. 选择拍摄景别</h3>
+          <p class="section-subtitle">盲盒模式下，景别可以选择默认随机（跟随风格）或指定统一景别</p>
+          <div class="framing-grid">
+            <!-- 默认选项 -->
+            <div class="framing-item" 
+              :class="{ active: selectedFraming === null || selectedFraming === 'default' }"
+              @click="selectedFraming = 'default'"
+            >
+              <div class="framing-icon-box">🎲</div>
+              <div class="framing-meta">
+                <span class="framing-label">默认随机</span>
+                <span class="framing-desc">使用每款风格最适合的景别</span>
+              </div>
+              <div class="active-check" v-if="selectedFraming === null || selectedFraming === 'default'">
+                <el-icon><Check /></el-icon>
+              </div>
+            </div>
+            <!-- 具体选项 -->
+            <div v-for="opt in framingOptions" :key="opt.value" 
+              class="framing-item" 
+              :class="{ active: selectedFraming === opt.value }"
+              @click="selectedFraming = opt.value"
+            >
+              <div class="framing-icon-box">{{ opt.icon }}</div>
+              <div class="framing-meta">
+                <span class="framing-label">{{ opt.label }}</span>
+                <span class="framing-desc">{{ opt.desc }}</span>
+              </div>
+              <div class="active-check" v-if="selectedFraming === opt.value">
+                <el-icon><Check /></el-icon>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- ===== 照着样子拍 Step 1 ===== -->
@@ -1294,6 +1416,125 @@ h2 { color: #f7c873; font-size: 1.1rem; margin-bottom: 16px; font-weight: 700; }
 @media (max-width: 768px) {
   .framing-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* 照片比例选择区域样式 */
+.aspect-ratio-section {
+  margin-top: 32px;
+  text-align: left;
+}
+
+.aspect-ratio-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.aspect-ratio-item {
+  position: relative;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+.aspect-ratio-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(212, 175, 55, 0.4);
+  transform: translateY(-2px);
+}
+
+.aspect-ratio-item.active {
+  background: rgba(212, 175, 55, 0.15);
+  border-color: #d4af37;
+  box-shadow: 0 0 15px rgba(212, 175, 55, 0.2);
+}
+
+.aspect-ratio-preview {
+  width: 50px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.aspect-ratio-item.active .aspect-ratio-preview {
+  border-color: rgba(212, 175, 55, 0.4);
+  background: rgba(212, 175, 55, 0.08);
+}
+
+.aspect-ratio-box {
+  border: 2px solid rgba(255, 255, 255, 0.6);
+  border-radius: 3px;
+  transition: all 0.3s;
+}
+
+.aspect-ratio-item.active .aspect-ratio-box {
+  border-color: #d4af37;
+}
+
+/* 9:16 portrait */
+.aspect-ratio-preview.portrait .aspect-ratio-box {
+  width: 16px;
+  height: 28px;
+}
+
+/* 3:4 photo */
+.aspect-ratio-preview.photo .aspect-ratio-box {
+  width: 22px;
+  height: 28px;
+}
+
+/* 1:1 square */
+.aspect-ratio-preview.square .aspect-ratio-box {
+  width: 24px;
+  height: 24px;
+}
+
+.aspect-ratio-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.aspect-ratio-label {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #fff;
+}
+
+.aspect-ratio-desc {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 2px;
+}
+
+@media (max-width: 576px) {
+  .aspect-ratio-grid {
+    grid-template-columns: 1fr;
+  }
+  .aspect-ratio-item {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 10px 14px;
+    gap: 14px;
+  }
+  .aspect-ratio-meta {
+    align-items: flex-start;
+    text-align: left;
   }
 }
 </style>

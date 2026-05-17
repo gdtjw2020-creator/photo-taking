@@ -113,7 +113,8 @@ class AIService:
             from io import BytesIO
             
             # 1. 确定尺寸和质量
-            target_size = "auto" if input_url else (size or "auto")
+            # 如果有背景底图 (ref_url)，自动匹配底图尺寸 ("auto")；否则使用配置的尺寸 (size)
+            target_size = "auto" if ref_url else (size or "auto")
             target_quality = quality or "auto"
 
             # 2. 调试日志
